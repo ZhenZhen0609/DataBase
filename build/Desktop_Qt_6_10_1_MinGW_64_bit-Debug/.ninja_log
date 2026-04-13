@@ -1,0 +1,17 @@
+# ninja log v6
+3	452	7977625711427180	DBMS_autogen/timestamp	fb9b21788c7a7614
+465	2344	7977625712240405	CMakeFiles/DBMS.dir/mainwindow.cpp.obj	873ab90e7c56ccfc
+3	452	7977625711427180	DBMS_autogen/mocs_compilation.cpp	fb9b21788c7a7614
+2345	2573	7977625731043022	DBMS.exe	8d6f078547d6ad01
+3	452	7977625711427180	E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/timestamp	fb9b21788c7a7614
+3	452	7977625711427180	E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/mocs_compilation.cpp	fb9b21788c7a7614
+462	1996	7977625712209426	CMakeFiles/DBMS.dir/main.cpp.obj	cd405432ba46ec3e
+459	1969	7977625712179272	CMakeFiles/DBMS.dir/DBMS_autogen/mocs_compilation.cpp.obj	afa0c72deb275bdb
+8	120	7977637803800018	DBMS_autogen/timestamp	fb9b21788c7a7614
+8	120	7977637803800018	DBMS_autogen/mocs_compilation.cpp	fb9b21788c7a7614
+8	120	7977637803800018	E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/timestamp	fb9b21788c7a7614
+8	120	7977637803800018	E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/mocs_compilation.cpp	fb9b21788c7a7614
+128	1687	7977637804978139	CMakeFiles/DBMS.dir/storagemanager.cpp.obj	5910ccf779ba6116
+120	1696	7977637804925192	CMakeFiles/DBMS.dir/main.cpp.obj	cd405432ba46ec3e
+123	1986	7977637804948102	CMakeFiles/DBMS.dir/mainwindow.cpp.obj	873ab90e7c56ccfc
+1986	2190	7977637823562833	DBMS.exe	251b4966bf05ca31
