@@ -25,6 +25,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         common.h
         storagemanager.h storagemanager.cpp
+        authmanager.h authmanager.cpp
+        schemamanager.h schemamanager.cpp
 
 
 
