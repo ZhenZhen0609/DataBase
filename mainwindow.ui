@@ -70,47 +70,16 @@
     <property name="title">
      <string>数据库</string>
     </property>
-    <addaction name="actionLogin"/>
-    <addaction name="actionRegister"/>
-    <addaction name="actionCreateDB"/>
-    <addaction name="separator"/>
-    <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menu_2">
     <property name="title">
      <string>帮助</string>
     </property>
-    <addaction name="actionAbout"/>
    </widget>
    <addaction name="menu"/>
    <addaction name="menu_2"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="actionLogin">
-   <property name="text">
-    <string>登录</string>
-   </property>
-  </action>
-  <action name="actionRegister">
-   <property name="text">
-    <string>注册</string>
-   </property>
-  </action>
-  <action name="actionCreateDB">
-   <property name="text">
-    <string>创建数据库</string>
-   </property>
-  </action>
-  <action name="actionExit">
-   <property name="text">
-    <string>退出</string>
-   </property>
-  </action>
-  <action name="actionAbout">
-   <property name="text">
-    <string>关于</string>
-   </property>
-  </action>
  </widget>
  <resources/>
  <connections/>

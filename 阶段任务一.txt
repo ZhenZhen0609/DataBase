@@ -1,0 +1,47 @@
+项目总览
+🔴 红圈 (A)：StorageManager.cpp/.h
+🟠 橙圈 (B)：AuthManager.cpp/.h SchemaManager.cpp/.h
+🔵 蓝圈 (C)：RecordManager.cpp/.h
+
+DBMS 第一阶段
+
+🔴 红圈 (A) 文件夹建出来了
+第一步任务： 实现 bool createDatabase(QString dbName)
+具体逻辑：
+1.去程序运行目录下的 data 文件夹（如果没有就建一个）。
+2.根据用户输入的 dbName，用 QDir().mkdir(path) 建个新文件夹。
+成功标准： 运行程序，在你的电脑桌面上（或项目目录下）真的出现了一个叫 "MyTestDB" 的文件夹。
+
+🟠 橙圈 (B) 登录弹窗能验证成功了
+第一步任务： 实现 bool login(QString user, QString pwd)
+具体逻辑：
+1.先手动写一个 users.json 文件，存个 {"admin": "123456"}。
+2.写一个函数，读这个 JSON，看看用户输入的账号密码对不对。
+成功标准： 在控制台打印出："Login Success!" 或者用 qDebug() 输出布尔值。
+
+🔵 蓝圈 (C) 文件里存进几条数据了
+第一步任务： 实现 bool insertRecord(QString tableName, QJsonObject data)
+具体逻辑：
+1.先不管红圈 A 有没有建好文件夹，你自己先手动建个 test.json。
+2.练习用 QJsonDocument 和 QFile，把一个包含 id 和 name 的 JSON 对象追加写进这个文件。
+成功标准： 打开 test.json 文件，能看到你刚才通过代码写进去的那行数据。后面和A的文件夹进行对接。
+
+⭐ 进度全景图：（加入UI 连接）
+1. 红圈 A 的 Response：物理空间的诞生
+动作： 在 UI 上点“新建数据库”，输入 Student_System。
+Response（反馈）：
+o控制台： 打印出 [Storage] Folder "data/Student_System" created successfully.
+o本地硬盘： 你会看到在项目文件夹里，真的多出了一个文件夹。
+UI 变化： 左边的 QTreeView 刷新，出现了一个叫 Student_System 的小图标。
+2. 橙圈 B 的 Response：系统的安全门槛
+动作： 启动程序，弹出一个登录框，输入账号 admin，密码 123456。
+Response（反馈）：
+o函数返回值： 返回 true。
+o日志窗口： 打印出 [Auth] User "admin" logged in at 10:30 AM.
+UI 变化： 登录窗口自动消失，主界面原本灰色的“新建数据库”按钮变亮（激活）。
+3. 蓝圈 C 的 Response：数据的持久化记录
+动作： 在 UI 的右侧表格里填入一条学生信息（如：张三，20岁），点击“保存”。
+Response（反馈）：
+o返回值： 返回一个 ResponseStatus::OK。
+o文件变化： 用记事本打开 data/Student_System/test.json，发现末尾多了一行数据。
+UI 变化： 底部的日志显示 [Data] Successfully inserted 1 record into "test".

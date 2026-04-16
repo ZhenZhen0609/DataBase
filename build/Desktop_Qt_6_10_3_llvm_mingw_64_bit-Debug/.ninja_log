@@ -1,0 +1,23 @@
+# ninja log v6
+26	297	7980112220636132	DBMS_autogen/timestamp	28358c45a98df20d
+26	297	7980112220636132	DBMS_autogen/mocs_compilation.cpp	28358c45a98df20d
+26	297	7980112220636132	D:/aboutCoding/IDE/qt/DataBase-main/build/Desktop_Qt_6_10_3_llvm_mingw_64_bit-Debug/DBMS_autogen/timestamp	28358c45a98df20d
+26	297	7980112220636132	D:/aboutCoding/IDE/qt/DataBase-main/build/Desktop_Qt_6_10_3_llvm_mingw_64_bit-Debug/DBMS_autogen/mocs_compilation.cpp	28358c45a98df20d
+1071	3100	7980111583428438	CMakeFiles/DBMS.dir/schemamanager.cpp.obj	4c87ac9d6606da59
+1064	3404	7980111583383739	CMakeFiles/DBMS.dir/storagemanager.cpp.obj	93e38a93b31fad9e
+1053	3704	7980111583271871	CMakeFiles/DBMS.dir/DBMS_autogen/mocs_compilation.cpp.obj	3579a6eefddc10ed
+299	1766	7980112223433969	CMakeFiles/DBMS.dir/main.cpp.obj	34c2009821260f58
+1067	3845	7980111583383739	CMakeFiles/DBMS.dir/authmanager.cpp.obj	dd0fa87910bb9352
+302	1867	7980112223474268	CMakeFiles/DBMS.dir/mainwindow.cpp.obj	68ce3abf2a7a0709
+1867	1976	7980112239122162	DBMS.exe	3f6cbd2b89fdb264
+30	974	7980148864212730	DBMS_autogen/timestamp	28358c45a98df20d
+30	974	7980148864212730	DBMS_autogen/mocs_compilation.cpp	28358c45a98df20d
+30	974	7980148864212730	D:/aboutCoding/IDE/qt/DataBase-main/build/Desktop_Qt_6_10_3_llvm_mingw_64_bit-Debug/DBMS_autogen/timestamp	28358c45a98df20d
+30	974	7980148864212730	D:/aboutCoding/IDE/qt/DataBase-main/build/Desktop_Qt_6_10_3_llvm_mingw_64_bit-Debug/DBMS_autogen/mocs_compilation.cpp	28358c45a98df20d
+984	2603	7980148865524910	CMakeFiles/DBMS.dir/storagemanager.cpp.obj	93e38a93b31fad9e
+989	2772	7980148865582344	CMakeFiles/DBMS.dir/recordmanager.cpp.obj	6d49ecb69e830a58
+976	2809	7980148865445041	CMakeFiles/DBMS.dir/DBMS_autogen/mocs_compilation.cpp.obj	3579a6eefddc10ed
+987	2906	7980148865562219	CMakeFiles/DBMS.dir/schemamanager.cpp.obj	4c87ac9d6606da59
+982	2944	7980148865509845	CMakeFiles/DBMS.dir/mainwindow.cpp.obj	68ce3abf2a7a0709
+979	3089	7980148865478690	CMakeFiles/DBMS.dir/main.cpp.obj	34c2009821260f58
+3089	3870	7980148886547430	DBMS.exe	de06561263cf092d

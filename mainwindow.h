@@ -2,8 +2,6 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include "AuthManager.h"
-#include "StorageManager.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -19,15 +17,7 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-private slots:
-    void onLogin();
-    void onRegister();
-    void onCreateDatabase();
-    void onExit();
-
 private:
     Ui::MainWindow *ui;
-    AuthManager *authManager;
-    StorageManager *storageManager;
 };
 #endif // MAINWINDOW_H
