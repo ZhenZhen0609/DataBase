@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "AuthManager.h"
 #include "SchemaManager.h"
+#include "storagemanager.h"
 
 #include <QApplication>
 #include <QDebug>
@@ -16,6 +17,25 @@ int main(int argc, char *argv[])
     // 如果只需要运行测试（调试 AuthManager）
     if (RUN_TESTS_ONLY) {
         QCoreApplication a(argc, argv);
+
+        //红圈阶段二测试：
+        qDebug() << "\n=== StorageManager 阶段二测试开始 ===";
+        StorageManager sm;
+
+        // 步骤A：必须先有数据库文件夹，建表才有地方放
+        qDebug() << "正在准备数据库环境...";
+        sm.createDatabase("StudentDB");
+
+        // 步骤B：调用你刚写的核心函数，创建表
+        qDebug() << "正在创建物理表文件...";
+        bool createTableResult = sm.createTable("StudentDB", "Score");
+
+        if (createTableResult) {
+            qDebug() << "【测试成功】已返回 true！请去 build 目录检查文件。";
+        } else {
+            qDebug() << "【测试失败】返回了 false。";
+        }
+        qDebug() << "=== StorageManager 阶段二测试结束 ===\n";
 
         // 控制台测试内容
         AuthManager auth;
