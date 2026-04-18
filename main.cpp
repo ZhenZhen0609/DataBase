@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 #include "AuthManager.h"
 #include "SchemaManager.h"
-#include "storagemanager.h"
+#include "RecordManage
 
 #include <QApplication>
 #include <QDebug>
@@ -22,40 +22,9 @@ int main(int argc, char *argv[])
     if (RUN_TESTS_ONLY) {
         QCoreApplication a(argc, argv);
 
-        //红圈阶段二测试：
-        qDebug() << "\n=== StorageManager 阶段二测试开始 ===";
-        StorageManager sm;
-
-        // 步骤A：必须先有数据库文件夹，建表才有地方放
-        qDebug() << "正在准备数据库环境...";
-        sm.createDatabase("StudentDB");
-
-        // 步骤B：调用你刚写的核心函数，创建表
-        qDebug() << "正在创建物理表文件...";
-        bool createTableResult = sm.createTable("StudentDB", "Score");
-
-        if (createTableResult) {
-            qDebug() << "【测试成功】已返回 true！请去 build 目录检查文件。";
-        } else {
-            qDebug() << "【测试失败】返回了 false。";
-        }
-        qDebug() << "=== StorageManager 阶段二测试结束 ===\n";
-
-        // 控制台测试内容
-        AuthManager auth;
-
-        // 注册测试用户
-        auth.registerUser("admin", "123456");
-
-        // 尝试登录
-        bool success = auth.login("admin", "123456");
-        qDebug() << "登录结果:" << success;
-
-        bool fail = auth.login("admin", "wrong");
-        qDebug() << "错误密码登录结果:" << fail;
-
-        qDebug() << "校验 123 是 INT?" << SchemaManager::validateFieldType("INT", 123);
-        qDebug() << "校验 'abc' 是 INT?" << SchemaManager::validateFieldType("INT", "abc");
+        qDebug() << "\n========================================";
+        qDebug() << "          DBMS 阶段任务一测试套件";
+        qDebug() << "========================================\n";
 
         // 运行各模块测试
         runAuthTests();
