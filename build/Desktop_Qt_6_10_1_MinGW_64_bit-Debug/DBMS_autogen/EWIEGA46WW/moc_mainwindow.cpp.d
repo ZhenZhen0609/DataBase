@@ -1,5 +1,14 @@
 E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46WW/moc_mainwindow.cpp: E:/DB/DataBase/mainwindow.h \
   E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/moc_predefs.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QDataStream \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QDateTime \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QFile \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QJsonObject \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QList \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QMap \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QObject \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QString \
+  D:/QT/6.10.1/mingw_64/include/QtCore/QVariant \
   D:/QT/6.10.1/mingw_64/include/QtCore/q17memory.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/q20functional.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/q20iterator.h \
@@ -23,6 +32,9 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/6.10.1/mingw_64/include/QtCore/qbytearrayalgorithms.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qbytearraylist.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qbytearrayview.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qcalendar.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qcborcommon.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qcborvalue.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qchar.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qcheckedint_impl.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qcompare.h \
@@ -37,9 +49,12 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/6.10.1/mingw_64/include/QtCore/qcontiguouscache.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qdarwinhelpers.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qdatastream.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qdatetime.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qdebug.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qendian.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qexceptionhandling.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qfile.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qfiledevice.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qflags.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qfloat16.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qforeach.h \
@@ -50,12 +65,18 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/6.10.1/mingw_64/include/QtCore/qglobalstatic.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qhash.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qhashfunctions.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qiodevice.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qiodevicebase.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qiterable.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qiterator.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qjsondocument.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qjsonobject.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qjsonparseerror.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qjsonvalue.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qlatin1stringview.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qline.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qlist.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qlocale.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qlogging.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qmalloc.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qmap.h \
@@ -76,6 +97,7 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/6.10.1/mingw_64/include/QtCore/qprocessordetection.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qrect.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qrefcount.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qregularexpression.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qscopedpointer.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qscopeguard.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qset.h \
@@ -121,7 +143,9 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/6.10.1/mingw_64/include/QtCore/qtversionchecks.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qtypeinfo.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qtypes.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/qurl.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qutf8stringview.h \
+  D:/QT/6.10.1/mingw_64/include/QtCore/quuid.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qvariant.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qvarlengtharray.h \
   D:/QT/6.10.1/mingw_64/include/QtCore/qversiontagging.h \
@@ -174,11 +198,14 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/allocator.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/atomic_base.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/atomic_lockfree_defines.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/basic_ios.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/basic_ios.tcc \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/basic_string.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/basic_string.tcc \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/char_traits.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/charconv.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/chrono.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/codecvt.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/concept_check.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/cpp_type_traits.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/cxxabi_forced.h \
@@ -188,6 +215,10 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/exception.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/exception_defines.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/exception_ptr.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/fs_dir.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/fs_fwd.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/fs_ops.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/fs_path.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/functexcept.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/functional_hash.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/hash_bytes.h \
@@ -195,9 +226,15 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/hashtable_policy.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/invoke.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/ios_base.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/istream.tcc \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/list.tcc \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/locale_classes.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/locale_classes.tcc \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/locale_conv.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/locale_facets.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/locale_facets.tcc \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/locale_facets_nonio.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/locale_facets_nonio.tcc \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/localefwd.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/memory_resource.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/memoryfwd.h \
@@ -205,11 +242,13 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/nested_exception.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/new_allocator.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/node_handle.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/ostream.tcc \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/ostream_insert.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/parse_numbers.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/postypes.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/predefined_ops.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/ptr_traits.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/quoted_string.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/range_access.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/refwrap.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/requires_hosted.h \
@@ -217,6 +256,7 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/shared_ptr_atomic.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/shared_ptr_base.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/specfun.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/sstream.tcc \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_abs.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_function.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_algo.h \
@@ -261,6 +301,7 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/climits \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/clocale \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cmath \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/codecvt \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/compare \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cstddef \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cstdint \
@@ -269,6 +310,7 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cstring \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ctime \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cwchar \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cwctype \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/debug/assertions.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/debug/debug.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/exception \
@@ -279,17 +321,23 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ext/numeric_traits.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ext/string_conversions.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ext/type_traits.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/filesystem \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/functional \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/initializer_list \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/iomanip \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ios \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/iosfwd \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/istream \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/iterator \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/limits \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/list \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/locale \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/map \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/memory \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/new \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/numeric \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/optional \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ostream \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/pstl/execution_defs.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/pstl/glue_algorithm_defs.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/pstl/glue_memory_defs.h \
@@ -297,6 +345,7 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/pstl/pstl_config.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ratio \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/set \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/sstream \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/stdexcept \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/stdlib.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/streambuf \
@@ -329,10 +378,14 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/c++config.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/c++locale.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/cpu_defines.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/ctype_base.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/ctype_inline.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/error_constants.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/gthr-default.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/gthr.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/messages_members.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/os_defines.h \
+  D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/time_members.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/limits.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/stdarg.h \
   D:/QT/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/stdbool.h \
@@ -373,4 +426,8 @@ E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/EWIEGA46W
   D:/QT/Tools/mingw1310_64/x86_64-w64-mingw32/include/sys/types.h \
   D:/QT/Tools/mingw1310_64/x86_64-w64-mingw32/include/time.h \
   D:/QT/Tools/mingw1310_64/x86_64-w64-mingw32/include/vadefs.h \
-  D:/QT/Tools/mingw1310_64/x86_64-w64-mingw32/include/wchar.h
+  D:/QT/Tools/mingw1310_64/x86_64-w64-mingw32/include/wchar.h \
+  D:/QT/Tools/mingw1310_64/x86_64-w64-mingw32/include/wctype.h \
+  E:/DB/DataBase/AuthManager.h \
+  E:/DB/DataBase/StorageManager.h \
+  E:/DB/DataBase/common.h

@@ -1,40 +1,85 @@
 #include "storagemanager.h"
 #include <QDir>
 #include <QDebug>
+#include <cstring> // 用于 strncpy
 
-StorageManager::StorageManager() {}
+    StorageManager::StorageManager() {}
 
 bool StorageManager::createDatabase(QString dbName)
 {
-    // 1. 获取数据存储根目录（来自 common.h 的 "./data/"）
+    // ... （保持你原有的阶段一代码不变）...
     QString rootPath = Config::DATA_PATH;
-
-    // 2. 检查并创建根目录文件夹 (data)
     QDir dir;
     if (!dir.exists(rootPath)) {
-        // mkpath 可以递归创建不存在的父目录
-        if (!dir.mkpath(rootPath)) {
-            qDebug() << "[Storage] Critical: Could not create root data directory.";
-            return false;
-        }
+        if (!dir.mkpath(rootPath)) return false;
     }
-
-    // 3. 构建完整的数据库路径（例如 "./data/Student_System"） [cite: 10]
     QString dbPath = rootPath + dbName;
-
-    // 4. 使用 QDir().mkdir 创建新文件夹 [cite: 10]
-    if (dir.exists(dbPath)) {
-        qDebug() << "[Storage] Database folder already exists:" << dbPath;
-        return true; // 已经存在则视为成功
-    }
-
+    if (dir.exists(dbPath)) return true;
     if (dir.mkdir(dbPath)) {
-        // 5. 按照任务书要求的格式输出成功日志
-        // 使用 .arg() 动态填充路径到字符串中
         qDebug() << QString("[Storage] Folder \"%1\" created successfully.").arg(dbPath);
         return true;
+    }
+    return false;
+}
+
+bool StorageManager::createTable(QString dbName, QString tableName)
+{
+    // 1. 确认数据库文件夹是否存在
+    QString dbPath = Config::DATA_PATH + dbName;
+    QDir dir(dbPath);
+    if (!dir.exists()) {
+        qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
+        return false;
+    }
+
+    // 2. 构建需要创建的文件路径 [cite: 52, 53]
+    QString tdfPath = dir.filePath(tableName + ".tdf");
+    QString trdPath = dir.filePath(tableName + ".trd");
+    QString tbPath  = dir.filePath(dbName + ".tb"); // 表描述文件 [cite: 403]
+
+    QFile tdfFile(tdfPath);
+    QFile trdFile(trdPath);
+
+    // 3. 检查表是否已经存在
+    if (tdfFile.exists() || trdFile.exists()) {
+        qDebug() << "[Storage] Error: Table already exists:" << tableName;
+        return false;
+    }
+
+    // 4. 创建 .tdf 和 .trd 物理文件 [cite: 51]
+    if (!tdfFile.open(QIODevice::WriteOnly) || !trdFile.open(QIODevice::WriteOnly)) {
+        qDebug() << "[Storage] Error: Failed to create table physical files.";
+        return false;
+    }
+    tdfFile.close();
+    trdFile.close();
+
+    // 5. 按照 3.12.5 要求，组装 TableBlock 头部信息 [cite: 54, 407]
+    TableBlock block;
+    memset(&block, 0, sizeof(TableBlock)); // 初始化清空内存
+
+    // 安全地拷贝字符串，防止溢出
+    strncpy(block.name, tableName.toUtf8().constData(), sizeof(block.name) - 1);
+    strncpy(block.tdf, tdfPath.toUtf8().constData(), sizeof(block.tdf) - 1);
+    strncpy(block.trd, trdPath.toUtf8().constData(), sizeof(block.trd) - 1);
+
+    block.record_num = 0; // 初始记录数为 0 [cite: 221]
+    block.field_num = 0;  // 初始字段数为 0 [cite: 221]
+    block.crtime = QDateTime::currentSecsSinceEpoch();
+    block.mtime = block.crtime;
+
+    // 6. 将表信息追加写入 .tb 文件
+    QFile tbFile(tbPath);
+    // Append 模式：如果文件不存在会自动创建，如果存在则在末尾追加
+    if (tbFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        tbFile.write(reinterpret_cast<const char*>(&block), sizeof(TableBlock));
+        tbFile.close();
+
+        // 按照任务书要求的成功标准反馈
+        qDebug() << QString("[Storage] Table %1 created in %2. files: .tdf and .trd generated.").arg(tableName, dbName);
+        return true;
     } else {
-        qDebug() << "[Storage] Failed to create database folder:" << dbName;
+        qDebug() << "[Storage] Error: Failed to update .tb file.";
         return false;
     }
 }

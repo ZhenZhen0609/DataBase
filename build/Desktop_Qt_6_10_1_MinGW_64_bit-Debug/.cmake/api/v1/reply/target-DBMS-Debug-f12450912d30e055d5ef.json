@@ -75,13 +75,13 @@
 			{
 				"command" : 4,
 				"file" : 1,
-				"line" : 69,
+				"line" : 72,
 				"parent" : 0
 			},
 			{
 				"command" : 5,
 				"file" : 1,
-				"line" : 52,
+				"line" : 55,
 				"parent" : 0
 			},
 			{
@@ -378,7 +378,10 @@
 			[
 				0,
 				1,
-				2
+				2,
+				7,
+				9,
+				11
 			]
 		}
 	],
@@ -501,7 +504,10 @@
 			[
 				0,
 				1,
-				2
+				2,
+				7,
+				9,
+				11
 			]
 		},
 		{
@@ -510,7 +516,10 @@
 			[
 				3,
 				5,
-				6
+				6,
+				8,
+				10,
+				12
 			]
 		},
 		{
@@ -524,14 +533,14 @@
 			"name" : "",
 			"sourceIndexes" : 
 			[
-				7
+				13
 			]
 		},
 		{
 			"name" : "CMake Rules",
 			"sourceIndexes" : 
 			[
-				8
+				14
 			]
 		}
 	],
@@ -570,6 +579,39 @@
 			"backtrace" : 4,
 			"path" : "common.h",
 			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"path" : "storagemanager.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "storagemanager.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 4,
+			"path" : "authmanager.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "authmanager.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 4,
+			"path" : "schemamanager.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 4,
+			"compileGroupIndex" : 0,
+			"path" : "schemamanager.cpp",
+			"sourceGroupIndex" : 0
 		},
 		{
 			"backtrace" : 0,
