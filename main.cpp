@@ -1,7 +1,8 @@
 #include "mainwindow.h"
 #include "AuthManager.h"
 #include "SchemaManager.h"
-#include "RecordManage
+#include "recordmanager.h"
+#include "storagemanager.h"
 
 #include <QApplication>
 #include <QDebug>
@@ -22,18 +23,29 @@ int main(int argc, char *argv[])
     if (RUN_TESTS_ONLY) {
         QCoreApplication a(argc, argv);
 
-        qDebug() << "\n========================================";
-        qDebug() << "          DBMS 阶段任务一测试套件";
-        qDebug() << "========================================\n";
+        qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+        qDebug() << "║                    DBMS 测试套件 - 阶段任务一览                  ║";
+        qDebug() << "╠════════════════════════════════════════════════════════════════╣";
+        qDebug() << "║  阶段一（基础功能）:                                            ║";
+        qDebug() << "║    🔴红圈A: StorageManager - 创建数据库文件夹                    ║";
+        qDebug() << "║    🟠橙圈B: AuthManager - 用户登录验证                          ║";
+        qDebug() << "║    🔵蓝圈C: RecordManager - JSON格式数据插入查询                 ║";
+        qDebug() << "╠════════════════════════════════════════════════════════════════╣";
+        qDebug() << "║  阶段二（进阶功能）:                                            ║";
+        qDebug() << "║    🔴红圈A: StorageManager - 创建.tdf/.trd/.tb表文件             ║";
+        qDebug() << "║    🟠橙圈B: SchemaManager - 字段规则管理与表结构持久化           ║";
+        qDebug() << "║    🔵蓝圈C: RecordManager - 结构化插入（校验.tdf）读取（.trd）    ║";
+        qDebug() << "║    💗粉圈D: MainWindow - UI建表对话框与数据实时刷新              ║";
+        qDebug() << "╚════════════════════════════════════════════════════════════════╝\n";
 
         // 运行各模块测试
         runAuthTests();
         runSchemaTests();
         runRecordTests();
 
-        qDebug() << "\n========================================";
-        qDebug() << "            所有测试完成";
-        qDebug() << "========================================\n";
+        qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+        qDebug() << "║                      所有测试执行完成                            ║";
+        qDebug() << "╚════════════════════════════════════════════════════════════════╝\n";
 
         return 0; // 测试完成直接退出
     }
@@ -46,12 +58,18 @@ int main(int argc, char *argv[])
     return a.exec();
 }
 
-// 认证模块测试
+// 认证模块测试（阶段一 🟠橙圈B + 阶段二 🟠橙圈B字段校验）
 void runAuthTests()
 {
     AuthManager auth;
 
-    qDebug() << "\n=== 橙圈B - 认证管理器测试 ===";
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段一 🟠橙圈B + 阶段二 🟠橙圈B - 认证管理器测试                ║";
+    qDebug() << "║  模块: AuthManager + SchemaManager字段校验                       ║";
+    qDebug() << "║  阶段一任务: 用户登录验证（admin/123456）                        ║";
+    qDebug() << "║  阶段二任务: 字段类型校验（INT/TEXT/DOUBLE/BOOLEAN）             ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+    qDebug() << "\n--- 阶段一 🟠橙圈B: 用户登录验证 ---";
 
     // 测试1: 正确的账号密码
     qDebug() << "\n[测试1] 测试正确的账号密码 (admin/123456)";
@@ -113,7 +131,8 @@ void runAuthTests()
         qDebug() << "测试6 失败!";
     }
 
-    // 类型校验测试
+    // 阶段二 🟠橙圈B: 字段类型校验测试
+    qDebug() << "\n--- 阶段二 🟠橙圈B: 字段类型校验 ---";
     qDebug() << "\n[测试7] 字段类型校验测试";
     qDebug() << "校验 123 是 INT? " << SchemaManager::validateFieldType("INT", 123);
     qDebug() << "校验 'abc' 是 INT? " << SchemaManager::validateFieldType("INT", "abc");
@@ -122,16 +141,24 @@ void runAuthTests()
     qDebug() << "校验 true 是 BOOLEAN? " << SchemaManager::validateFieldType("BOOLEAN", true);
     qDebug() << "测试7 通过!";
 
-    qDebug() << "\n=== 橙圈B 测试完成 ===";
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段一 🟠橙圈B + 阶段二 🟠橙圈B - 认证管理器测试完成            ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
 }
 
-// 模式管理器测试
+// 模式管理器测试（阶段二 🟠橙圈B + 阶段二 🔴红圈A）
 void runSchemaTests()
 {
     SchemaManager schemaManager;
     StorageManager storageManager;
 
-    qDebug() << "\n=== 橙圈B - 模式管理器测试 ===";
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段二 🟠橙圈B + 阶段二 🔴红圈A - 模式管理器测试                ║";
+    qDebug() << "║  模块: SchemaManager + StorageManager                           ║";
+    qDebug() << "║  阶段二🔴红圈A任务: 创建.tdf/.trd/.tb表文件                     ║";
+    qDebug() << "║  阶段二🟠橙圈B任务: 字段规则管理与表结构持久化                   ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+    qDebug() << "\n--- 阶段二 🔴红圈A: StorageManager创建表文件 ---";
 
     // 先创建测试数据库
     qDebug() << "\n[前置] 创建测试数据库 TestDB";
@@ -219,17 +246,25 @@ void runSchemaTests()
         qDebug() << "测试7 失败!";
     }
 
-    qDebug() << "\n=== 橙圈B 模式管理器测试完成 ===";
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段二 🟠橙圈B + 阶段二 🔴红圈A - 模式管理器测试完成            ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
 }
 
-// 记录管理器测试（蓝圈C）
+// 记录管理器测试（阶段一 🔵蓝圈C + 阶段二 🔵蓝圈C）
 void runRecordTests()
 {
     RecordManager recordManager;
     StorageManager storageManager;
     SchemaManager schemaManager;
 
-    qDebug() << "\n=== 蓝圈C - 记录管理器测试 ===";
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段一 🔵蓝圈C + 阶段二 🔵蓝圈C - 记录管理器测试                ║";
+    qDebug() << "║  模块: RecordManager + StorageManager + SchemaManager           ║";
+    qDebug() << "║  阶段一🔵蓝圈C任务: JSON格式数据插入查询（已完成）               ║";
+    qDebug() << "║  阶段二🔵蓝圈C任务: 结构化插入（校验.tdf）读取（.trd）(进行中)  ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+    qDebug() << "\n--- 阶段一 🔵蓝圈C: JSON格式数据操作 ---";
 
     // 先创建测试数据库和表
     qDebug() << "\n[前置] 创建测试数据库 Student_System";
@@ -301,7 +336,7 @@ void runRecordTests()
         qDebug() << "测试4 失败!";
     }
 
-    // 测试5: 验证数据文件存在
+    // 测试5: 验证数据文件存在（阶段一JSON格式）
     QString filePath = "./data/Student_System/test.json";
     qDebug() << "\n[测试5] 验证数据文件存在";
     QFile file(filePath);
@@ -313,5 +348,8 @@ void runRecordTests()
         qDebug() << "测试5 失败!";
     }
 
-    qDebug() << "\n=== 蓝圈C 记录管理器测试完成 ===";
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段一 🔵蓝圈C + 阶段二 🔵蓝圈C - 记录管理器测试完成            ║";
+    qDebug() << "║  备注: 当前使用JSON格式(.json)，阶段二需改为.trd二进制格式        ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
 }

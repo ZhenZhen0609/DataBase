@@ -1,0 +1,275 @@
+1.github下载压缩包，并找一个文件夹存好文件
+
+2.打开qt后，左上角一栏选中工具，选中maintenance tool打开qt版本控制器，下载6.10版本
+
+3.打开项目，直接选择解压缩好的文件夹，点击CMakelist.txt，然后点击左下角的锤头尝试编译
+
+4.测试产生的test.json会自动在Desktop_Qt_6_10_3_llvm_mingw_64_bit-Debug/data中创建，可以在那里查看，根据测试代码的内容，json的内容应该是：
+[
+    {
+        "_created_at": "2026-04-16T11:54:50",
+        "age": 20,
+        "id": 1,
+        "name": "张三"
+    },
+    {
+        "_created_at": "2026-04-16T11:54:50",
+        "age": 22,
+        "id": 2,
+        "name": "李四"
+    }
+]
+这样子的
+
+=======================================================================
+                        代码文件详细说明
+=======================================================================
+
+一、项目概述
+
+当前文件结构
+DataBase-main/
+├── main.cpp              # 程序入口（集成了GUI启动与测试模式）
+├── mainwindow.cpp/h      # 主窗口界面
+├── storagemanager.cpp/h  # 存储管理器（红圈A任务）
+├── AuthManager.cpp/h     # 认证管理器（橙圈B任务）
+├── SchemaManager.cpp/h   # 模式管理器（橙圈B任务）
+├── RecordManager.cpp/h   # 记录管理器（蓝圈C任务）
+├── common.h              # 公共类型定义
+├── users.json            # 用户数据文件（运行自动生成）
+└── CMakeLists.txt        # 项目构建配置
+
+生成的数据文件结构（运行时创建）
+./data/
+├── {dbName}/
+│   ├── {tableName}.tdf   # 表结构文件（JSON格式存储字段定义）
+│   ├── {tableName}.trd   # 数据记录文件（二进制格式）
+│   └── {dbName}.tb       # 表描述文件（二进制格式）
+└── {dbName}.json         # 旧格式数据文件（蓝圈C当前使用）
+
+二、核心代码文件详解
+
+2.1 main.cpp - 程序入口
+功能：Qt应用程序的主入口点，负责初始化应用并根据配置决定启动GUI或运行控制台测试。
+当前实现：
+- 通过静态常量 RUN_TESTS_ONLY 控制程序走向。
+- 若 RUN_TESTS_ONLY = true：创建 QCoreApplication，依次运行 AuthManager 注册/登录逻辑、SchemaManager 字段校验与表结构测试、RecordManager 数据插入与查询测试，最后退出。
+- 若 RUN_TESTS_ONLY = false：创建 QApplication，显示 MainWindow 进入标准 GUI 事件循环。
+设计原理：
+- 利用条件变量控制入口，方便开发者在"调试阶段验证后端逻辑"与"集成阶段展示界面"之间灵活切换，无需修改多个文件。
+
+2.2 mainwindow.cpp/h - 主窗口
+功能：应用程序的主界面窗口，未来包含数据库操作UI控件。
+当前实现：
+- mainwindow.h：定义MainWindow类，继承自QMainWindow
+- mainwindow.cpp：实现窗口构造和析构函数
+设计原理：
+- 使用QMainWindow作为基类，提供菜单栏、工具栏等标准组件
+- 通过ui->setupUi(this)加载Qt Designer设计的界面
+
+2.3 common.h - 公共类型定义
+功能：定义项目中全局使用的数据类型和常量。
+主要内容：
+- FieldType枚举：支持的数据类型（INT、TEXT、DOUBLE、BOOLEAN）
+- Field结构体：字段定义（名称、类型、长度、是否必填、是否主键）
+- TableSchema结构体：表结构定义（表名、字段列表）
+- TableBlock结构体：表描述块（表名、记录数、字段数、文件路径、时间戳）
+- ResponseStatus枚举：操作返回状态（OK、ERROR、DB_NOT_FOUND等）
+- Response结构体：统一响应格式（状态、消息、数据）
+- Config命名空间：全局常量（DATA_PATH = "./data/"、USER_FILE = "users.json"）
+设计原理：
+- 使用命名空间管理全局常量，避免命名冲突
+- 枚举类型提供类型安全的状态标识
+- 结构体封装相关数据，便于传递和管理
+
+2.4 storagemanager.cpp/h - 存储管理器（红圈A）
+功能：负责数据库文件夹和表物理文件的创建、管理和读取。
+核心方法：
+- createDatabase(dbName)：创建数据库文件夹（阶段一任务）
+- createTable(dbName, tableName)：创建空表文件（兼容旧接口）
+- createTable(dbName, tableName, fields)：创建表并写入字段结构到.tdf文件（阶段二任务）
+- loadTableSchema(dbName, tableName)：从.tdf文件读取表结构（阶段二任务）
+实现逻辑（createTable带字段参数版本）：
+1. 确认数据库文件夹存在
+2. 构建文件路径：{dbName}/{tableName}.tdf、{dbName}/{tableName}.trd、{dbName}/{dbName}.tb
+3. 检查表是否已存在
+4. 创建.trd数据记录文件（空文件）
+5. 组装TableBlock头部信息（表名、记录数、字段数、文件路径、时间戳）
+6. 将TableBlock写入.tb文件（二进制格式）
+7. 将字段结构（名称、类型、长度、是否主键等）以JSON格式写入.tdf文件
+8. 输出成功日志：[Storage] Table xxx created in xxx with x fields.
+设计原理：
+- 使用Qt的QDir类进行文件系统操作
+- 使用QJsonDocument将表结构序列化为JSON格式存储
+- TableBlock使用二进制格式写入.tb文件，提高读取效率
+
+2.5 AuthManager.cpp/h - 认证管理器（橙圈B）
+功能：负责用户登录验证、新用户注册及密码安全管理。
+核心方法：
+- login(user, pwd)：验证用户名和密码（密码通过SHA256哈希比对）。
+- registerUser(user, pwd)：注册新用户，密码加密后写入文件。
+- hashPassword(pwd)：对明文密码进行SHA256哈希加密。
+- loadUsers()：从JSON文件加载用户数据。
+- findUserFile()：多路径智能搜索users.json位置。
+- createDefaultUserFile()：若文件不存在，自动创建包含默认账号(admin/123456)的初始文件。
+登录验证流程：
+用户输入 → login() → loadUsers() → findUserFile() → 读取JSON → 哈希比对
+设计原理：
+- 使用QFile和QJsonDocument进行数据持久化。
+- 密码使用QCryptographicHash::Sha256加密，避免明文存储风险。
+- 支持多路径搜索（优先当前/可执行目录，其次上级/根目录），适应不同运行环境。
+
+2.6 SchemaManager.cpp/h - 模式管理器（橙圈B）
+功能：负责数据库字段（模式）的类型校验和表结构持久化管理，与StorageManager协作完成物理文件操作。
+核心方法：
+- validateFieldType(type, value)：校验某个值是否符合指定的类型约束（支持INT、TEXT、DOUBLE、BOOLEAN）。
+- validateField(field, value)：校验某个值是否符合指定的字段定义（包含必填检查）。
+- validateRecord(schema, record)：校验整条记录的数据类型是否符合表结构。
+- createTable(dbName, schema)：调用StorageManager创建表物理文件并写入字段定义（阶段二任务）。
+- loadTableSchema(dbName, tableName)：调用StorageManager从.tdf文件加载表结构（阶段二任务）。
+- loadTables(dbName)：扫描数据库目录下所有.tdf文件，加载所有表结构（阶段二任务）。
+- dropTable(dbName, tableName)：删除表的.tdf和.trd物理文件（阶段二任务）。
+设计原理：
+- SchemaManager负责业务逻辑层面的表结构管理
+- StorageManager负责底层物理文件操作
+- 通过协作模式实现职责分离，提高代码可维护性
+
+2.7 RecordManager.cpp/h - 记录管理器（蓝圈C）
+功能：负责数据记录的插入和查询操作。
+核心方法：
+- insertRecord(dbName, tableName, data)：插入一条记录到指定表（阶段一：使用.json格式；阶段二待优化）。
+- selectAllRecords(dbName, tableName)：查询指定表的所有记录（阶段一：使用.json格式；阶段二待优化）。
+当前实现逻辑（阶段一）：
+1. 确保数据库目录存在（不存在则创建）
+2. 构建表数据文件路径：./data/{dbName}/{tableName}.json
+3. 读取现有数据（JSON数组格式）
+4. 添加新记录（自动添加创建时间戳_created_at）
+5. 写入文件并返回操作状态
+阶段二待实现：
+- 插入前读取.tdf文件进行字段类型校验
+- 将数据写入.trd文件（而非.json文件）
+- 使用二进制格式存储记录以提高性能
+设计原理：
+- 使用QJsonDocument处理JSON数据的读写。
+- 每条记录自动添加_created_at字段记录创建时间。
+- 返回统一的Response结构体，包含状态、消息和数据。
+
+2.8 users.json - 用户数据文件
+功能：存储用户账号和加密后的密码哈希值。
+内容格式：
+{
+    "admin": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "user1": "f561aaf6ef0bf48046a1449572e684c6348e9e0a47404e440814b4264a02319d"
+}
+存储位置：
+- 由 AuthManager 自动搜索路径决定，通常位于可执行文件同目录下。
+
+2.9 CMakeLists.txt - 项目构建配置
+功能：CMake构建系统的配置文件，定义项目编译规则。
+主要配置项：
+- 指定CMake最低版本要求(3.16)
+- 设置项目名称和版本
+- 启用Qt自动编译特性(AUTOUIC、AUTOMOC、AUTORCC)
+- 添加源文件到项目（包括新增的 SchemaManager 和 RecordManager 文件）
+- 链接Qt库（Widgets、Core）
+
+三、数据流向图
+用户操作 → MainWindow → AuthManager → users.json (验证)
+                          ↓
+                   数据库操作 → SchemaManager (字段校验/表结构)
+                                    ↓
+                          StorageManager (创建.tdf/.trd/.tb文件)
+                                    ↓
+                          RecordManager → {tableName}.json (数据持久化)
+
+四、模块协作关系
+┌─────────────────────────────────────────────────────────────┐
+│                        MainWindow                           │
+│                       (粉圈D - UI层)                        │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        ▼                   ▼                   ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│ AuthManager   │   │SchemaManager  │   │RecordManager  │
+│ (橙圈B-认证)  │   │(橙圈B-模式)   │   │ (蓝圈C-记录)  │
+└───────┬───────┘   └───────┬───────┘   └───────┬───────┘
+        │                   │                   │
+        ▼                   │                   │
+┌───────────────┐           │                   │
+│  users.json   │           │                   │
+└───────────────┘           │                   │
+                            ▼                   │
+                   ┌───────────────┐            │
+                   │StorageManager │◄───────────┘
+                   │  (红圈A-存储) │
+                   └───────┬───────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+   {dbName}.tb       {table}.tdf        {table}.trd
+   (表描述文件)      (表结构文件)        (数据记录文件)
+
+五、阶段任务完成情况
+
+5.1 阶段一任务完成情况
+| 圈标识 | 模块 | 任务描述 | 状态 | 完成度 |
+|--------|------|----------|------|--------|
+| 🔴 红圈A | StorageManager | 创建数据库文件夹 | ✅已完成 | 100% |
+| 🟠 橙圈B | AuthManager | 登录验证（admin/123456） | ✅已完成 | 100% |
+| 🔵 蓝圈C | RecordManager | 插入简单数据到.json文件 | ✅已完成 | 100% |
+
+5.2 阶段二任务完成情况
+| 圈标识 | 模块 | 任务描述 | 状态 | 完成度 |
+|--------|------|----------|------|--------|
+| 🔴 红圈A | StorageManager | 创建表文件(.tdf/.trd/.tb)并写入表结构 | ✅已完成 | 100% |
+| 🟠 橙圈B | SchemaManager | 字段规则管理，与StorageManager协作 | ✅已完成 | 100% |
+| 🔵 蓝圈C | RecordManager | 结构化插入（校验.tdf）和读取（从.trd） | ⚠️进行中
+| 💗 粉圈D | MainWindow | 建表对话框与数据实时刷新UI | ❌未开始 | 0% |
+
+5.3 各阶段任务详细说明
+
+【阶段一 - 基础功能】
+- 🔴 红圈A：`createDatabase()` 方法已实现，可在./data/目录下创建数据库文件夹
+- 🟠 橙圈B：`login()` 方法已实现，支持用户名密码验证，密码SHA256加密存储
+- 🔵 蓝圈C：`insertRecord()` 方法已实现，可将JSON数据写入{tableName}.json文件
+
+【阶段二 - 进阶功能】
+- 🔴 红圈A：`createTable(dbName, tableName, fields)` 已实现，创建.tdf/.trd/.tb三个物理文件，并将字段结构写入.tdf
+- 🟠 橙圈B：SchemaManager已与StorageManager协作，表结构的创建、加载、删除均通过.tdf文件操作
+- 🔵 蓝圈C：当前仍使用.json格式存储数据，需修改为：①插入前读取.tdf校验字段类型 ②将数据写入.trd文件
+- 💗 粉圈D：UI界面尚未实现建表弹窗和数据展示功能
+
+六、测试验证说明
+测试开关 RUN_TESTS_ONLY 已设置为 true，运行程序将自动执行以下测试：
+
+1. 橙圈B - 认证管理器测试：
+   - 正确账号密码登录
+   - 错误密码登录
+   - 不存在用户登录
+   - 新用户注册
+   - 重复注册检测
+   - 字段类型校验（INT、TEXT、DOUBLE、BOOLEAN）
+
+2. 橙圈B - 模式管理器测试：
+   - 创建表结构（写入.tdf文件）
+   - 创建重复表检测
+   - 加载表结构（从.tdf文件读取）
+   - 加载不存在表检测
+   - 加载所有表（扫描.tdf文件）
+   - 删除表（删除.tdf和.trd文件）
+   - 删除不存在表检测
+
+3. 蓝圈C - 记录管理器测试：
+   - 插入记录（张三，20岁）
+   - 插入记录（李四，22岁）
+   - 查询所有记录
+   - 查询不存在表检测
+   - 验证数据文件存在
+   
+测试通过标准：
+- 控制台输出显示所有测试"通过!"
+- 物理文件验证：./data/TestDB/students.tdf 存在且包含字段定义
+- 物理文件验证：./data/Student_System/test.json 存在且包含插入的数据
+
+最新更新至————4.18

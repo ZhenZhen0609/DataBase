@@ -1,4 +1,5 @@
 #include "SchemaManager.h"
+#include "storagemanager.h"
 #include <QDebug>
 #include <QFile>
 #include <QJsonDocument>
@@ -84,157 +85,72 @@ bool SchemaManager::ensureDbDirectory(const QString &dbName) const
 
 Response SchemaManager::createTable(const QString &dbName, const TableSchema &schema)
 {
+    // 调用 StorageManager 创建表物理文件并写入字段结构 [cite: 52]
+    StorageManager storageManager;
+    
+    // 确保数据库目录存在
     if (!ensureDbDirectory(dbName)) {
         return {ResponseStatus::ERROR, QString("[Schema] Failed to create database directory '%1'").arg(dbName), QVariant()};
     }
 
-    QString filePath = getSchemaFilePath(dbName);
-    QFile file(filePath);
-    
-    // 读取现有表结构
-    QJsonArray tables;
-    if (file.exists()) {
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            return {ResponseStatus::ERROR, QString("[Schema] Failed to open schema file '%1'").arg(filePath), QVariant()};
-        }
-        
-        QByteArray data = file.readAll();
-        file.close();
-        
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        if (doc.isArray()) {
-            tables = doc.array();
-        }
+    // 使用 StorageManager 创建表并写入字段结构到 .tdf 文件
+    if (!storageManager.createTable(dbName, schema.tableName, schema.fields)) {
+        return {ResponseStatus::ERROR, QString("[Schema] Failed to create table '%1' in database '%2'").arg(schema.tableName, dbName), QVariant()};
     }
 
-    // 检查表是否已存在
-    for (const QJsonValue &tableVal : tables) {
-        if (tableVal.isObject()) {
-            QJsonObject tableObj = tableVal.toObject();
-            if (tableObj["tableName"].toString() == schema.tableName) {
-                return {ResponseStatus::ERROR, QString("[Schema] Table '%1' already exists").arg(schema.tableName), QVariant()};
-            }
-        }
-    }
-
-    // 将表结构转换为 JSON 对象
-    QJsonObject tableObj;
-    tableObj["tableName"] = schema.tableName;
-    
-    QJsonArray fieldsArray;
-    for (const Field &field : schema.fields) {
-        QJsonObject fieldObj;
-        fieldObj["name"] = field.name;
-        fieldObj["type"] = static_cast<int>(field.type);
-        fieldObj["length"] = field.length;
-        fieldObj["isNotNull"] = field.isNotNull;
-        fieldObj["isPrimaryKey"] = field.isPrimaryKey;
-        fieldsArray.append(fieldObj);
-    }
-    tableObj["fields"] = fieldsArray;
-
-    // 添加到数组并写入文件
-    tables.append(tableObj);
-    
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return {ResponseStatus::ERROR, QString("[Schema] Failed to write schema file '%1'").arg(filePath), QVariant()};
-    }
-
-    QJsonDocument doc(tables);
-    file.write(doc.toJson(QJsonDocument::Indented));
-    file.close();
-
-    qDebug() << QString("[Schema] Table '%1' created successfully").arg(schema.tableName);
+    qDebug() << QString("[Schema] Table '%1' created successfully with %2 fields").arg(schema.tableName).arg(schema.fields.size());
     return {ResponseStatus::OK, QString("[Schema] Table '%1' created successfully").arg(schema.tableName), QVariant()};
 }
 
 Response SchemaManager::loadTableSchema(const QString &dbName, const QString &tableName)
 {
-    QString filePath = getSchemaFilePath(dbName);
-    QFile file(filePath);
+    // 调用 StorageManager 从 .tdf 文件加载表结构
+    StorageManager storageManager;
+    QList<Field> fields = storageManager.loadTableSchema(dbName, tableName);
 
-    if (!file.exists()) {
-        return {ResponseStatus::DB_NOT_FOUND, QString("[Schema] Database '%1' not found").arg(dbName), QVariant()};
-    }
-
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return {ResponseStatus::ERROR, QString("[Schema] Failed to open schema file '%1'").arg(filePath), QVariant()};
-    }
-
-    QByteArray data = file.readAll();
-    file.close();
-
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isArray()) {
-        return {ResponseStatus::ERROR, "[Schema] Invalid schema file format", QVariant()};
-    }
-
-    for (const QJsonValue &tableVal : doc.array()) {
-        if (tableVal.isObject()) {
-            QJsonObject tableObj = tableVal.toObject();
-            if (tableObj["tableName"].toString() == tableName) {
-                TableSchema schema;
-                schema.tableName = tableName;
-                
-                QJsonArray fieldsArray = tableObj["fields"].toArray();
-                for (const QJsonValue &fieldVal : fieldsArray) {
-                    QJsonObject fieldObj = fieldVal.toObject();
-                    Field field;
-                    field.name = fieldObj["name"].toString();
-                    field.type = static_cast<FieldType>(fieldObj["type"].toInt());
-                    field.length = fieldObj["length"].toInt();
-                    field.isNotNull = fieldObj["isNotNull"].toBool();
-                    field.isPrimaryKey = fieldObj["isPrimaryKey"].toBool();
-                    schema.fields.append(field);
-                }
-
-                return {ResponseStatus::OK, QString("[Schema] Loaded table '%1'").arg(tableName), QVariant::fromValue(schema)};
-            }
+    if (fields.isEmpty()) {
+        // 检查是否是数据库不存在还是表不存在
+        QString dbPath = Config::DATA_PATH + dbName;
+        QDir dir(dbPath);
+        if (!dir.exists()) {
+            return {ResponseStatus::DB_NOT_FOUND, QString("[Schema] Database '%1' not found").arg(dbName), QVariant()};
         }
+        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Schema] Table '%1' not found").arg(tableName), QVariant()};
     }
 
-    return {ResponseStatus::TABLE_NOT_FOUND, QString("[Schema] Table '%1' not found").arg(tableName), QVariant()};
+    TableSchema schema;
+    schema.tableName = tableName;
+    schema.fields = fields;
+
+    return {ResponseStatus::OK, QString("[Schema] Loaded table '%1' with %2 fields").arg(tableName).arg(fields.size()), QVariant::fromValue(schema)};
 }
 
 Response SchemaManager::loadTables(const QString &dbName)
 {
-    QString filePath = getSchemaFilePath(dbName);
-    QFile file(filePath);
+    QString dbPath = Config::DATA_PATH + dbName;
+    QDir dir(dbPath);
 
-    if (!file.exists()) {
+    if (!dir.exists()) {
         return {ResponseStatus::DB_NOT_FOUND, QString("[Schema] Database '%1' not found").arg(dbName), QVariant()};
     }
 
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return {ResponseStatus::ERROR, QString("[Schema] Failed to open schema file '%1'").arg(filePath), QVariant()};
-    }
-
-    QByteArray data = file.readAll();
-    file.close();
-
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isArray()) {
-        return {ResponseStatus::ERROR, "[Schema] Invalid schema file format", QVariant()};
-    }
+    // 查找所有 .tdf 文件
+    QStringList filters;
+    filters << "*.tdf";
+    dir.setNameFilters(filters);
+    QStringList tdfFiles = dir.entryList(QDir::Files);
 
     QList<TableSchema> schemas;
-    for (const QJsonValue &tableVal : doc.array()) {
-        if (tableVal.isObject()) {
-            QJsonObject tableObj = tableVal.toObject();
+    StorageManager storageManager;
+
+    for (const QString &tdfFile : tdfFiles) {
+        QString tableName = tdfFile.left(tdfFile.size() - 4); // 移除 .tdf 后缀
+        QList<Field> fields = storageManager.loadTableSchema(dbName, tableName);
+        
+        if (!fields.isEmpty()) {
             TableSchema schema;
-            schema.tableName = tableObj["tableName"].toString();
-            
-            QJsonArray fieldsArray = tableObj["fields"].toArray();
-            for (const QJsonValue &fieldVal : fieldsArray) {
-                QJsonObject fieldObj = fieldVal.toObject();
-                Field field;
-                field.name = fieldObj["name"].toString();
-                field.type = static_cast<FieldType>(fieldObj["type"].toInt());
-                field.length = fieldObj["length"].toInt();
-                field.isNotNull = fieldObj["isNotNull"].toBool();
-                field.isPrimaryKey = fieldObj["isPrimaryKey"].toBool();
-                schema.fields.append(field);
-            }
+            schema.tableName = tableName;
+            schema.fields = fields;
             schemas.append(schema);
         }
     }
@@ -244,55 +160,32 @@ Response SchemaManager::loadTables(const QString &dbName)
 
 Response SchemaManager::dropTable(const QString &dbName, const QString &tableName)
 {
-    QString filePath = getSchemaFilePath(dbName);
-    QFile file(filePath);
+    QString dbPath = Config::DATA_PATH + dbName;
+    QDir dir(dbPath);
 
-    if (!file.exists()) {
+    if (!dir.exists()) {
         return {ResponseStatus::DB_NOT_FOUND, QString("[Schema] Database '%1' not found").arg(dbName), QVariant()};
     }
 
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return {ResponseStatus::ERROR, QString("[Schema] Failed to open schema file '%1'").arg(filePath), QVariant()};
-    }
+    // 检查 .tdf 文件是否存在
+    QString tdfPath = dir.filePath(tableName + ".tdf");
+    QString trdPath = dir.filePath(tableName + ".trd");
 
-    QByteArray data = file.readAll();
-    file.close();
-
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isArray()) {
-        return {ResponseStatus::ERROR, "[Schema] Invalid schema file format", QVariant()};
-    }
-
-    QJsonArray tables = doc.array();
-    QJsonArray newTables;
-    bool found = false;
-
-    for (const QJsonValue &tableVal : tables) {
-        if (tableVal.isObject()) {
-            QJsonObject tableObj = tableVal.toObject();
-            if (tableObj["tableName"].toString() != tableName) {
-                newTables.append(tableObj);
-            } else {
-                found = true;
-            }
-        }
-    }
-
-    if (!found) {
+    if (!QFile::exists(tdfPath)) {
         return {ResponseStatus::TABLE_NOT_FOUND, QString("[Schema] Table '%1' not found").arg(tableName), QVariant()};
     }
 
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return {ResponseStatus::ERROR, QString("[Schema] Failed to write schema file '%1'").arg(filePath), QVariant()};
+    // 删除 .tdf 和 .trd 文件
+    bool tdfRemoved = QFile::remove(tdfPath);
+    bool trdRemoved = QFile::remove(trdPath);
+
+    if (!tdfRemoved || !trdRemoved) {
+        return {ResponseStatus::ERROR, QString("[Schema] Failed to delete table files for '%1'").arg(tableName), QVariant()};
     }
 
-    QJsonDocument newDoc(newTables);
-    file.write(newDoc.toJson(QJsonDocument::Indented));
-    file.close();
-
-    // 删除数据表文件
-    QString tableFilePath = Config::DATA_PATH + dbName + "/" + tableName + ".json";
-    QFile::remove(tableFilePath);
+    // 同时删除 .json 文件（兼容旧格式）
+    QString jsonPath = dir.filePath(tableName + ".json");
+    QFile::remove(jsonPath);
 
     qDebug() << QString("[Schema] Table '%1' dropped successfully").arg(tableName);
     return {ResponseStatus::OK, QString("[Schema] Table '%1' dropped successfully").arg(tableName), QVariant()};
