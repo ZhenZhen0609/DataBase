@@ -28,6 +28,11 @@ QT_BEGIN_NAMESPACE
 class Ui_MainWindow
 {
 public:
+    QAction *actionLogin;
+    QAction *actionRegister;
+    QAction *actionCreateDB;
+    QAction *actionExit;
+    QAction *actionAbout;
     QWidget *centralwidget;
     QWidget *horizontalLayoutWidget;
     QHBoxLayout *horizontalLayout;
@@ -46,6 +51,16 @@ public:
         if (MainWindow->objectName().isEmpty())
             MainWindow->setObjectName("MainWindow");
         MainWindow->resize(917, 715);
+        actionLogin = new QAction(MainWindow);
+        actionLogin->setObjectName("actionLogin");
+        actionRegister = new QAction(MainWindow);
+        actionRegister->setObjectName("actionRegister");
+        actionCreateDB = new QAction(MainWindow);
+        actionCreateDB->setObjectName("actionCreateDB");
+        actionExit = new QAction(MainWindow);
+        actionExit->setObjectName("actionExit");
+        actionAbout = new QAction(MainWindow);
+        actionAbout->setObjectName("actionAbout");
         centralwidget = new QWidget(MainWindow);
         centralwidget->setObjectName("centralwidget");
         horizontalLayoutWidget = new QWidget(centralwidget);
@@ -88,6 +103,12 @@ public:
 
         menubar->addAction(menu->menuAction());
         menubar->addAction(menu_2->menuAction());
+        menu->addAction(actionLogin);
+        menu->addAction(actionRegister);
+        menu->addAction(actionCreateDB);
+        menu->addSeparator();
+        menu->addAction(actionExit);
+        menu_2->addAction(actionAbout);
 
         retranslateUi(MainWindow);
 
@@ -100,6 +121,11 @@ public:
     void retranslateUi(QMainWindow *MainWindow)
     {
         MainWindow->setWindowTitle(QCoreApplication::translate("MainWindow", "MainWindow", nullptr));
+        actionLogin->setText(QCoreApplication::translate("MainWindow", "\347\231\273\345\275\225", nullptr));
+        actionRegister->setText(QCoreApplication::translate("MainWindow", "\346\263\250\345\206\214", nullptr));
+        actionCreateDB->setText(QCoreApplication::translate("MainWindow", "\345\210\233\345\273\272\346\225\260\346\215\256\345\272\223", nullptr));
+        actionExit->setText(QCoreApplication::translate("MainWindow", "\351\200\200\345\207\272", nullptr));
+        actionAbout->setText(QCoreApplication::translate("MainWindow", "\345\205\263\344\272\216", nullptr));
         dataTableView->setTabText(dataTableView->indexOf(tab), QCoreApplication::translate("MainWindow", "\346\225\260\346\215\256\346\265\217\350\247\210", nullptr));
         dataTableView->setTabText(dataTableView->indexOf(tab_2), QCoreApplication::translate("MainWindow", "\350\241\250\347\273\223\346\236\204", nullptr));
         menu->setTitle(QCoreApplication::translate("MainWindow", "\346\225\260\346\215\256\345\272\223", nullptr));

@@ -315,11 +315,23 @@
 	"DEP_FILE_RULE_NAME" : "DBMS_autogen/timestamp",
 	"HEADERS" : 
 	[
+		[
+			"E:/DB/DataBase/authmanager.h",
+			"MU",
+			"EWIEGA46WW/moc_authmanager.cpp",
+			null
+		],
 		[ "E:/DB/DataBase/common.h", "MU", "EWIEGA46WW/moc_common.cpp", null ],
 		[
 			"E:/DB/DataBase/mainwindow.h",
 			"MU",
 			"EWIEGA46WW/moc_mainwindow.cpp",
+			null
+		],
+		[
+			"E:/DB/DataBase/schemamanager.h",
+			"MU",
+			"EWIEGA46WW/moc_schemamanager.cpp",
 			null
 		],
 		[
@@ -400,8 +412,10 @@
 	"SETTINGS_FILE" : "E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/CMakeFiles/DBMS_autogen.dir/AutogenUsed.txt",
 	"SOURCES" : 
 	[
+		[ "E:/DB/DataBase/authmanager.cpp", "MU", null ],
 		[ "E:/DB/DataBase/main.cpp", "MU", null ],
 		[ "E:/DB/DataBase/mainwindow.cpp", "MU", null ],
+		[ "E:/DB/DataBase/schemamanager.cpp", "MU", null ],
 		[ "E:/DB/DataBase/storagemanager.cpp", "MU", null ]
 	],
 	"UIC_OPTIONS" : [],

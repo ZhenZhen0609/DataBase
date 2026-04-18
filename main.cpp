@@ -1,8 +1,7 @@
 #include "mainwindow.h"
 #include "AuthManager.h"
 #include "SchemaManager.h"
-#include "RecordManager.h"
-#include "StorageManager.h"
+#include "RecordManage
 
 #include <QApplication>
 #include <QDebug>
