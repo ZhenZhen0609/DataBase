@@ -164,25 +164,28 @@ void runSchemaTests()
     qDebug() << "\n[前置] 创建测试数据库 TestDB";
     storageManager.createDatabase("TestDB");
 
-    // 测试1: 创建表结构
-    qDebug() << "\n[测试1] 创建表结构 (students)";
-    TableSchema studentSchema;
-    studentSchema.tableName = "students";
-    studentSchema.fields.append(Field("id", FieldType::INT, 10));
-    studentSchema.fields.append(Field("name", FieldType::TEXT, 50));
-    studentSchema.fields.append(Field("age", FieldType::INT, 3));
-    
-    Response createResult = schemaManager.createTable("TestDB", studentSchema);
-    qDebug() << "创建结果: " << (createResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
-    qDebug() << "消息: " << createResult.message;
-    if (createResult.status == ResponseStatus::OK) {
-        qDebug() << "测试1 通过!";
+    // 测试1: 使用新的 saveSchema 接口创建表结构
+    qDebug() << "\n[测试1] 使用 saveSchema 创建表结构 (students)";
+    QList<Field> studentFields;
+    studentFields.append(Field("id", FieldType::INT, 10));
+    studentFields.back().isPrimaryKey = true;
+    studentFields.back().isNotNull = true;
+    studentFields.append(Field("name", FieldType::TEXT, 50));
+    studentFields.append(Field("age", FieldType::INT, 3));
+
+    bool saveResult = schemaManager.saveSchema("TestDB", "students", studentFields);
+    qDebug() << "保存结果:" << (saveResult ? "成功 ✓" : "失败 ✗");
+    if (saveResult) {
+        qDebug() << "测试1 通过! 已通过 saveSchema 将字段规则写入 .tdf 文件。";
     } else {
         qDebug() << "测试1 失败!";
     }
 
-    // 测试2: 创建重复表
+    // 测试2: 创建重复表（应该失败）
     qDebug() << "\n[测试2] 创建重复表 (students)";
+    TableSchema studentSchema;
+    studentSchema.tableName = "students";
+    studentSchema.fields = studentFields;
     Response createResult2 = schemaManager.createTable("TestDB", studentSchema);
     qDebug() << "创建结果: " << (createResult2.status == ResponseStatus::ERROR ? "预期失败 ✓" : "意外成功 ✗");
     if (createResult2.status == ResponseStatus::ERROR) {
@@ -254,7 +257,7 @@ void runSchemaTests()
 // 记录管理器测试（阶段一 🔵蓝圈C + 阶段二 🔵蓝圈C）
 void runRecordTests()
 {
-    RecordManager recordManager;
+    RecordManager recordManager;  // 注意：变量名是 recordManager
     StorageManager storageManager;
     SchemaManager schemaManager;
 
@@ -318,7 +321,7 @@ void runRecordTests()
         qDebug() << "记录数量: " << records.size();
         for (const QJsonValue &val : records) {
             QJsonObject obj = val.toObject();
-            qDebug() << "  - id:" << obj["id"].toInt() << ", name:" << obj["name"].toString() 
+            qDebug() << "  - id:" << obj["id"].toInt() << ", name:" << obj["name"].toString()
                      << ", age:" << obj["age"].toInt();
         }
         qDebug() << "测试3 通过!";
