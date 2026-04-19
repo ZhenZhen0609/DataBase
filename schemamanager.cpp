@@ -12,7 +12,7 @@ SchemaManager::SchemaManager(QObject *parent) : QObject(parent) {}
 bool SchemaManager::validateFieldType(const QString &type, const QVariant &value)
 {
     QString upperType = type.toUpper();
-    
+
     if (upperType == "INT") {
         bool ok;
         value.toInt(&ok);
@@ -24,8 +24,12 @@ bool SchemaManager::validateFieldType(const QString &type, const QVariant &value
         value.toDouble(&ok);
         return ok;
     } else if (upperType == "BOOLEAN") {
-        return value.type() == QVariant::Bool || 
-               value.toString().toLower() == "true" || 
+#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
+        return value.metaType().id() == QMetaType::Bool ||
+#else
+        return value.type() == QVariant::Bool ||
+#endif
+               value.toString().toLower() == "true" ||
                value.toString().toLower() == "false";
     } else {
         qDebug() << "[Schema] 不支持的类型:" << type;
@@ -35,6 +39,12 @@ bool SchemaManager::validateFieldType(const QString &type, const QVariant &value
 
 bool SchemaManager::validateField(const Field &field, const QVariant &value) const
 {
+    // 主键字段必须非空
+    if (field.isPrimaryKey && (value.isNull() || value.toString().isEmpty())) {
+        qDebug() << "[Schema] Primary key field" << field.name << "cannot be null";
+        return false;
+    }
+
     // 检查必填字段
     if (field.isNotNull && (value.isNull() || value.toString().isEmpty())) {
         qDebug() << "[Schema] Field" << field.name << "is required but empty";
@@ -62,7 +72,7 @@ bool SchemaManager::validateRecord(const TableSchema &schema, const QJsonObject 
 {
     for (const Field &field : schema.fields) {
         QVariant value = record.value(field.name).toVariant();
-        
+
         if (!validateField(field, value)) {
             qDebug() << "[Schema] Field validation failed for" << field.name;
             return false;
@@ -83,19 +93,82 @@ bool SchemaManager::ensureDbDirectory(const QString &dbName) const
     return dir.exists(dbPath) || dir.mkpath(dbPath);
 }
 
-Response SchemaManager::createTable(const QString &dbName, const TableSchema &schema)
+// ==================== 新增：橙圈B核心实现 ====================
+
+QByteArray SchemaManager::serializeSchema(const QList<Field> &fields) const
 {
-    // 调用 StorageManager 创建表物理文件并写入字段结构 [cite: 52]
-    StorageManager storageManager;
-    
-    // 确保数据库目录存在
-    if (!ensureDbDirectory(dbName)) {
-        return {ResponseStatus::ERROR, QString("[Schema] Failed to create database directory '%1'").arg(dbName), QVariant()};
+    QJsonArray fieldsArray;
+    for (const Field &field : fields) {
+        QJsonObject fieldObj;
+        fieldObj["name"] = field.name;
+        fieldObj["type"] = static_cast<int>(field.type);
+        fieldObj["length"] = field.length;
+        fieldObj["isNotNull"] = field.isNotNull;
+        fieldObj["isPrimaryKey"] = field.isPrimaryKey;
+        fieldsArray.append(fieldObj);
     }
 
-    // 使用 StorageManager 创建表并写入字段结构到 .tdf 文件
-    if (!storageManager.createTable(dbName, schema.tableName, schema.fields)) {
-        return {ResponseStatus::ERROR, QString("[Schema] Failed to create table '%1' in database '%2'").arg(schema.tableName, dbName), QVariant()};
+    QJsonObject root;
+    root["fields"] = fieldsArray;
+    QJsonDocument doc(root);
+    return doc.toJson(QJsonDocument::Indented);
+}
+
+bool SchemaManager::saveSchema(const QString &dbName, const QString &tableName, const QList<Field> &fields)
+{
+    // 1. 字段规则校验
+    if (fields.isEmpty()) {
+        qDebug() << "[Schema] Cannot save schema: field list is empty.";
+        return false;
+    }
+
+    // 检查字段名是否重复
+    QStringList fieldNames;
+    for (const Field &f : fields) {
+        if (fieldNames.contains(f.name)) {
+            qDebug() << "[Schema] Duplicate field name:" << f.name;
+            return false;
+        }
+        fieldNames.append(f.name);
+    }
+
+    // 2. 序列化字段定义（转为 JSON 字节流）
+    QByteArray schemaData = serializeSchema(fields);
+    if (schemaData.isEmpty()) {
+        qDebug() << "[Schema] Failed to serialize fields.";
+        return false;
+    }
+
+    // 3. 确保数据库目录存在
+    if (!ensureDbDirectory(dbName)) {
+        qDebug() << "[Schema] Database directory does not exist and cannot be created:" << dbName;
+        return false;
+    }
+
+    // 4. 调用接口：写入 .tdf 定义文件
+    StorageManager storage;
+    if (!storage.writeTableDefinition(dbName, tableName, schemaData)) {
+        qDebug() << "[Schema] Failed to write table definition via StorageManager.";
+        return false;
+    }
+
+    qDebug() << QString("[Schema] Schema saved for table '%1' with %2 fields.").arg(tableName).arg(fields.size());
+    return true;
+}
+
+// 兼容保留，内部调用新接口
+
+Response SchemaManager::createTable(const QString &dbName, const TableSchema &schema)
+{
+    // 直接复用 saveSchema
+    if (!saveSchema(dbName, schema.tableName, schema.fields)) {
+        return {ResponseStatus::ERROR, QString("[Schema] Failed to save schema for table '%1'").arg(schema.tableName), QVariant()};
+    }
+
+    // 创建物理文件（.trd 和 .tb）
+    StorageManager storage;
+    if (!storage.createTable(dbName, schema.tableName, schema.fields)) {
+        return {ResponseStatus::ERROR, QString("[Schema] Failed to create physical files for table '%1'").arg(schema.tableName), QVariant()};
     }
 
     qDebug() << QString("[Schema] Table '%1' created successfully with %2 fields").arg(schema.tableName).arg(schema.fields.size());
@@ -104,12 +177,10 @@ Response SchemaManager::createTable(const QString &dbName, const TableSchema &sc
 
 Response SchemaManager::loadTableSchema(const QString &dbName, const QString &tableName)
 {
-    // 调用 StorageManager 从 .tdf 文件加载表结构
     StorageManager storageManager;
     QList<Field> fields = storageManager.loadTableSchema(dbName, tableName);
 
     if (fields.isEmpty()) {
-        // 检查是否是数据库不存在还是表不存在
         QString dbPath = Config::DATA_PATH + dbName;
         QDir dir(dbPath);
         if (!dir.exists()) {
@@ -134,7 +205,6 @@ Response SchemaManager::loadTables(const QString &dbName)
         return {ResponseStatus::DB_NOT_FOUND, QString("[Schema] Database '%1' not found").arg(dbName), QVariant()};
     }
 
-    // 查找所有 .tdf 文件
     QStringList filters;
     filters << "*.tdf";
     dir.setNameFilters(filters);
@@ -144,9 +214,9 @@ Response SchemaManager::loadTables(const QString &dbName)
     StorageManager storageManager;
 
     for (const QString &tdfFile : tdfFiles) {
-        QString tableName = tdfFile.left(tdfFile.size() - 4); // 移除 .tdf 后缀
+        QString tableName = tdfFile.left(tdfFile.size() - 4);
         QList<Field> fields = storageManager.loadTableSchema(dbName, tableName);
-        
+
         if (!fields.isEmpty()) {
             TableSchema schema;
             schema.tableName = tableName;
@@ -167,7 +237,6 @@ Response SchemaManager::dropTable(const QString &dbName, const QString &tableNam
         return {ResponseStatus::DB_NOT_FOUND, QString("[Schema] Database '%1' not found").arg(dbName), QVariant()};
     }
 
-    // 检查 .tdf 文件是否存在
     QString tdfPath = dir.filePath(tableName + ".tdf");
     QString trdPath = dir.filePath(tableName + ".trd");
 
@@ -175,7 +244,6 @@ Response SchemaManager::dropTable(const QString &dbName, const QString &tableNam
         return {ResponseStatus::TABLE_NOT_FOUND, QString("[Schema] Table '%1' not found").arg(tableName), QVariant()};
     }
 
-    // 删除 .tdf 和 .trd 文件
     bool tdfRemoved = QFile::remove(tdfPath);
     bool trdRemoved = QFile::remove(trdPath);
 
@@ -183,7 +251,6 @@ Response SchemaManager::dropTable(const QString &dbName, const QString &tableNam
         return {ResponseStatus::ERROR, QString("[Schema] Failed to delete table files for '%1'").arg(tableName), QVariant()};
     }
 
-    // 同时删除 .json 文件（兼容旧格式）
     QString jsonPath = dir.filePath(tableName + ".json");
     QFile::remove(jsonPath);
 

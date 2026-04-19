@@ -45,6 +45,9 @@ public:
      */
     bool createTable(QString dbName, QString tableName, const QList<Field> &fields);
 
+    // 接口：仅写入 .tdf 定义文件内容
+    bool writeTableDefinition(const QString &dbName, const QString &tableName, const QByteArray &data);
+
     /**
      * @brief 读取 .tdf 文件中的表结构
      * @param dbName 数据库名称

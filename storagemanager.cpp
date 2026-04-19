@@ -1,17 +1,16 @@
 #include "storagemanager.h"
 #include <QDir>
 #include <QDebug>
-#include <cstring> // 用于 strncpy
+#include <cstring>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 
-    StorageManager::StorageManager() {}
+StorageManager::StorageManager() {}
 
 bool StorageManager::createDatabase(QString dbName)
 {
-    // ... （保持你原有的阶段一代码不变）...
     QString rootPath = Config::DATA_PATH;
     QDir dir;
     if (!dir.exists(rootPath)) {
@@ -28,7 +27,6 @@ bool StorageManager::createDatabase(QString dbName)
 
 bool StorageManager::createTable(QString dbName, QString tableName)
 {
-    // 1. 确认数据库文件夹是否存在
     QString dbPath = Config::DATA_PATH + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
@@ -36,21 +34,18 @@ bool StorageManager::createTable(QString dbName, QString tableName)
         return false;
     }
 
-    // 2. 构建需要创建的文件路径 [cite: 52, 53]
     QString tdfPath = dir.filePath(tableName + ".tdf");
     QString trdPath = dir.filePath(tableName + ".trd");
-    QString tbPath  = dir.filePath(dbName + ".tb"); // 表描述文件 [cite: 403]
+    QString tbPath  = dir.filePath(dbName + ".tb");
 
     QFile tdfFile(tdfPath);
     QFile trdFile(trdPath);
 
-    // 3. 检查表是否已经存在
     if (tdfFile.exists() || trdFile.exists()) {
         qDebug() << "[Storage] Error: Table already exists:" << tableName;
         return false;
     }
 
-    // 4. 创建 .tdf 和 .trd 物理文件 [cite: 51]
     if (!tdfFile.open(QIODevice::WriteOnly) || !trdFile.open(QIODevice::WriteOnly)) {
         qDebug() << "[Storage] Error: Failed to create table physical files.";
         return false;
@@ -58,28 +53,20 @@ bool StorageManager::createTable(QString dbName, QString tableName)
     tdfFile.close();
     trdFile.close();
 
-    // 5. 按照 3.12.5 要求，组装 TableBlock 头部信息 [cite: 54, 407]
     TableBlock block;
-    memset(&block, 0, sizeof(TableBlock)); // 初始化清空内存
-
-    // 安全地拷贝字符串，防止溢出
+    memset(&block, 0, sizeof(TableBlock));
     strncpy(block.name, tableName.toUtf8().constData(), sizeof(block.name) - 1);
     strncpy(block.tdf, tdfPath.toUtf8().constData(), sizeof(block.tdf) - 1);
     strncpy(block.trd, trdPath.toUtf8().constData(), sizeof(block.trd) - 1);
-
-    block.record_num = 0; // 初始记录数为 0 [cite: 221]
-    block.field_num = 0;  // 初始字段数为 0 [cite: 221]
+    block.record_num = 0;
+    block.field_num = 0;
     block.crtime = QDateTime::currentSecsSinceEpoch();
     block.mtime = block.crtime;
 
-    // 6. 将表信息追加写入 .tb 文件
     QFile tbFile(tbPath);
-    // Append 模式：如果文件不存在会自动创建，如果存在则在末尾追加
     if (tbFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
         tbFile.write(reinterpret_cast<const char*>(&block), sizeof(TableBlock));
         tbFile.close();
-
-        // 按照任务书要求的成功标准反馈
         qDebug() << QString("[Storage] Table %1 created in %2. files: .tdf and .trd generated.").arg(tableName, dbName);
         return true;
     } else {
@@ -88,9 +75,30 @@ bool StorageManager::createTable(QString dbName, QString tableName)
     }
 }
 
+bool StorageManager::writeTableDefinition(const QString &dbName, const QString &tableName, const QByteArray &data)
+{
+    QString dbPath = Config::DATA_PATH + dbName;
+    QDir dir(dbPath);
+    if (!dir.exists()) {
+        qDebug() << "[Storage] Database folder does not exist:" << dbName;
+        return false;
+    }
+
+    QString tdfPath = dir.filePath(tableName + ".tdf");
+    QFile tdfFile(tdfPath);
+    if (!tdfFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qDebug() << "[Storage] Failed to open .tdf file for writing:" << tdfPath;
+        return false;
+    }
+
+    tdfFile.write(data);
+    tdfFile.close();
+    qDebug() << QString("[Storage] Written table definition to %1").arg(tdfPath);
+    return true;
+}
+
 bool StorageManager::createTable(QString dbName, QString tableName, const QList<Field> &fields)
 {
-    // 1. 确认数据库文件夹是否存在
     QString dbPath = Config::DATA_PATH + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
@@ -98,7 +106,6 @@ bool StorageManager::createTable(QString dbName, QString tableName, const QList<
         return false;
     }
 
-    // 2. 构建需要创建的文件路径 [cite: 52, 53]
     QString tdfPath = dir.filePath(tableName + ".tdf");
     QString trdPath = dir.filePath(tableName + ".trd");
     QString tbPath  = dir.filePath(dbName + ".tb");
@@ -106,47 +113,21 @@ bool StorageManager::createTable(QString dbName, QString tableName, const QList<
     QFile tdfFile(tdfPath);
     QFile trdFile(trdPath);
 
-    // 3. 检查表是否已经存在
     if (tdfFile.exists() || trdFile.exists()) {
         qDebug() << "[Storage] Error: Table already exists:" << tableName;
         return false;
     }
 
-    // 4. 创建 .trd 物理文件（数据记录文件）
     if (!trdFile.open(QIODevice::WriteOnly)) {
         qDebug() << "[Storage] Error: Failed to create .trd file.";
         return false;
     }
     trdFile.close();
 
-    // 5. 按照 3.12.5 要求，组装 TableBlock 头部信息 [cite: 54, 407]
-    TableBlock block;
-    memset(&block, 0, sizeof(TableBlock)); // 初始化清空内存
-
-    // 安全地拷贝字符串，防止溢出
-    strncpy(block.name, tableName.toUtf8().constData(), sizeof(block.name) - 1);
-    strncpy(block.tdf, tdfPath.toUtf8().constData(), sizeof(block.tdf) - 1);
-    strncpy(block.trd, trdPath.toUtf8().constData(), sizeof(block.trd) - 1);
-
-    block.record_num = 0; // 初始记录数为 0 [cite: 221]
-    block.field_num = fields.size();  // 设置字段数 [cite: 221]
-    block.crtime = QDateTime::currentSecsSinceEpoch();
-    block.mtime = block.crtime;
-
-    // 6. 将表信息追加写入 .tb 文件
-    QFile tbFile(tbPath);
-    if (!tbFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qDebug() << "[Storage] Error: Failed to update .tb file.";
-        return false;
-    }
-    tbFile.write(reinterpret_cast<const char*>(&block), sizeof(TableBlock));
-    tbFile.close();
-
-    // 7. 将字段结构写入 .tdf 文件 [cite: 52]
+    // 序列化字段定义并写入 .tdf
     QJsonObject schemaObj;
     schemaObj["tableName"] = tableName;
     schemaObj["fieldCount"] = fields.size();
-
     QJsonArray fieldsArray;
     for (const Field &field : fields) {
         QJsonObject fieldObj;
@@ -158,18 +139,35 @@ bool StorageManager::createTable(QString dbName, QString tableName, const QList<
         fieldsArray.append(fieldObj);
     }
     schemaObj["fields"] = fieldsArray;
+    QJsonDocument doc(schemaObj);
+    QByteArray schemaData = doc.toJson(QJsonDocument::Indented);
 
-    if (!tdfFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qDebug() << "[Storage] Error: Failed to create .tdf file.";
+    if (!writeTableDefinition(dbName, tableName, schemaData)) {
+        qDebug() << "[Storage] Error: Failed to write .tdf file.";
         return false;
     }
 
-    QJsonDocument doc(schemaObj);
-    tdfFile.write(doc.toJson(QJsonDocument::Indented));
-    tdfFile.close();
+    // 写入 .tb 表头信息
+    TableBlock block;
+    memset(&block, 0, sizeof(TableBlock));
+    strncpy(block.name, tableName.toUtf8().constData(), sizeof(block.name) - 1);
+    strncpy(block.tdf, tdfPath.toUtf8().constData(), sizeof(block.tdf) - 1);
+    strncpy(block.trd, trdPath.toUtf8().constData(), sizeof(block.trd) - 1);
+    block.record_num = 0;
+    block.field_num = fields.size();
+    block.crtime = QDateTime::currentSecsSinceEpoch();
+    block.mtime = block.crtime;
 
-    // 按照任务书要求的成功标准反馈
-    qDebug() << QString("[Storage] Table %1 created in %2 with %3 fields. files: .tdf, .trd generated.").arg(tableName, dbName).arg(fields.size());
+    QFile tbFile(tbPath);
+    if (!tbFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        qDebug() << "[Storage] Error: Failed to update .tb file.";
+        return false;
+    }
+    tbFile.write(reinterpret_cast<const char*>(&block), sizeof(TableBlock));
+    tbFile.close();
+
+    qDebug() << QString("[Storage] Table %1 created in %2 with %3 fields. files: .tdf, .trd generated.")
+                    .arg(tableName, dbName).arg(fields.size());
     return true;
 }
 
