@@ -1,0 +1,27 @@
+{
+    "fieldCount": 3,
+    "fields": [
+        {
+            "isNotNull": true,
+            "isPrimaryKey": true,
+            "length": 255,
+            "name": "qqq",
+            "type": 0
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 255,
+            "name": "www",
+            "type": 2
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 255,
+            "name": "eee",
+            "type": 3
+        }
+    ],
+    "tableName": "1"
+}

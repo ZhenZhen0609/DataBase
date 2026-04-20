@@ -8,97 +8,67 @@
 
 RecordManager::RecordManager() {}
 
-QString RecordManager::getTableFilePath(const QString &dbName, const QString &tableName) const
+QString RecordManager::getTableFilePath(const QString &username, const QString &dbName, const QString &tableName) const
 {
-    return Config::DATA_PATH + dbName + "/" + tableName + ".json";
+    return Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".json";
 }
 
-bool RecordManager::ensureDbDirectory(const QString &dbName) const
+bool RecordManager::ensureDbDirectory(const QString &username, const QString &dbName) const
 {
-    QString dbPath = Config::DATA_PATH + dbName;
+    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
     QDir dir;
     return dir.exists(dbPath) || dir.mkpath(dbPath);
 }
 
-Response RecordManager::insertRecord(const QString &dbName, const QString &tableName, const QJsonObject &data)
+Response RecordManager::insertRecord(const QString &username, const QString &dbName, const QString &tableName, const QJsonObject &data)
 {
-    // 1. 确保数据库目录存在
-    if (!ensureDbDirectory(dbName)) {
-        qDebug() << "[Data] Failed to create database directory:" << dbName;
+    if (!ensureDbDirectory(username, dbName))
         return {ResponseStatus::ERROR, QString("[Data] Failed to create database directory '%1'").arg(dbName), QVariant()};
-    }
 
-    // 2. 获取表文件路径
-    QString filePath = getTableFilePath(dbName, tableName);
-
-    // 3. 读取现有数据
+    QString filePath = getTableFilePath(username, dbName, tableName);
     QJsonArray records;
     QFile file(filePath);
 
     if (file.exists()) {
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qDebug() << "[Data] Failed to open table file for reading:" << filePath;
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
             return {ResponseStatus::ERROR, QString("[Data] Failed to open table '%1'").arg(tableName), QVariant()};
-        }
-
         QByteArray dataBytes = file.readAll();
         file.close();
-
         QJsonDocument doc = QJsonDocument::fromJson(dataBytes);
-        if (doc.isArray()) {
-            records = doc.array();
-        } else if (doc.isObject()) {
-            // 如果文件内容是单个对象，转换为数组
-            records.append(doc.object());
-        }
+        if (doc.isArray()) records = doc.array();
+        else if (doc.isObject()) records.append(doc.object());
     }
 
-    // 4. 添加新记录（带时间戳）
     QJsonObject newRecord = data;
     newRecord["_created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     records.append(newRecord);
 
-    // 5. 写入文件
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qDebug() << "[Data] Failed to open table file for writing:" << filePath;
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
         return {ResponseStatus::ERROR, QString("[Data] Failed to write to table '%1'").arg(tableName), QVariant()};
-    }
 
-    QJsonDocument doc(records);
-    file.write(doc.toJson(QJsonDocument::Indented));
+    file.write(QJsonDocument(records).toJson(QJsonDocument::Indented));
     file.close();
-
-    // 6. 输出成功日志
-    qDebug() << QString("[Data] Successfully inserted 1 record into \"%1\".").arg(tableName);
 
     return {ResponseStatus::OK, QString("[Data] Successfully inserted 1 record into \"%1\"").arg(tableName), QVariant(records.size())};
 }
 
-Response RecordManager::selectAllRecords(const QString &dbName, const QString &tableName)
+Response RecordManager::selectAllRecords(const QString &username, const QString &dbName, const QString &tableName)
 {
-    QString filePath = getTableFilePath(dbName, tableName);
+    QString filePath = getTableFilePath(username, dbName, tableName);
     QFile file(filePath);
 
-    if (!file.exists()) {
-        qDebug() << "[Data] Table file not found:" << filePath;
+    if (!file.exists())
         return {ResponseStatus::TABLE_NOT_FOUND, QString("[Data] Table '%1' not found").arg(tableName), QVariant()};
-    }
 
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "[Data] Failed to open table file:" << filePath;
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return {ResponseStatus::ERROR, QString("[Data] Failed to open table '%1'").arg(tableName), QVariant()};
-    }
 
     QByteArray dataBytes = file.readAll();
     file.close();
 
     QJsonDocument doc = QJsonDocument::fromJson(dataBytes);
-    if (!doc.isArray()) {
-        qDebug() << "[Data] Invalid table file format:" << filePath;
+    if (!doc.isArray())
         return {ResponseStatus::ERROR, "[Data] Invalid table file format", QVariant()};
-    }
-
-    qDebug() << QString("[Data] Retrieved %1 records from \"%2\".").arg(doc.array().size()).arg(tableName);
 
     return {ResponseStatus::OK, QString("[Data] Retrieved %1 records").arg(doc.array().size()), QVariant::fromValue(doc.array())};
 }

@@ -1,17 +1,4 @@
 # ninja log v6
-28	1908	7979634441397271	DBMS_autogen/timestamp	bbdaa6552d8b750f
-28	1908	7979634441397271	DBMS_autogen/mocs_compilation.cpp	bbdaa6552d8b750f
-28	1908	7979634441397271	C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autogen/timestamp	bbdaa6552d8b750f
-28	1908	7979634441397271	C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autogen/mocs_compilation.cpp	bbdaa6552d8b750f
-1976	8449	7979634444432403	CMakeFiles/DBMS.dir/schemamanager.cpp.obj	c671ffc00ace1044
-1959	9429	7979634444266386	CMakeFiles/DBMS.dir/storagemanager.cpp.obj	5e0298db0c1f652f
-1939	9935	7979634444043016	CMakeFiles/DBMS.dir/main.cpp.obj	adc9b1be6f423ff7
-1929	10025	7979634443959392	CMakeFiles/DBMS.dir/DBMS_autogen/mocs_compilation.cpp.obj	75e9ae336b7f2d97
-1967	10284	7979634444351933	CMakeFiles/DBMS.dir/authmanager.cpp.obj	abda743346567c30
-1950	10542	7979634444189077	CMakeFiles/DBMS.dir/mainwindow.cpp.obj	6ee1637a298a1f1e
-10543	11305	7979634530110464	DBMS.exe	e351b81b9ad95617
-18	77	7980145247153640	CMakeFiles/clean.additional	baedbe210acaa455
-77	102	7980145247779531	clean	577b940aee94fbd7
 44	1611	7980145263705123	DBMS_autogen/timestamp	bbdaa6552d8b750f
 44	1611	7980145263705123	DBMS_autogen/mocs_compilation.cpp	bbdaa6552d8b750f
 44	1611	7980145263705123	C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autogen/timestamp	bbdaa6552d8b750f
@@ -23,3 +10,16 @@
 1646	7731	7980145265801129	CMakeFiles/DBMS.dir/authmanager.cpp.obj	abda743346567c30
 1629	8562	7980145265611126	CMakeFiles/DBMS.dir/mainwindow.cpp.obj	6ee1637a298a1f1e
 8563	9219	7980145334982679	DBMS.exe	e351b81b9ad95617
+18	77	7980145247153640	CMakeFiles/clean.additional	baedbe210acaa455
+77	102	7980145247779531	clean	577b940aee94fbd7
+58	1517	7983918111639526	DBMS_autogen/timestamp	bbdaa6552d8b750f
+58	1517	7983918111639526	DBMS_autogen/mocs_compilation.cpp	bbdaa6552d8b750f
+58	1517	7983918111639526	C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autogen/timestamp	bbdaa6552d8b750f
+58	1517	7983918111639526	C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autogen/mocs_compilation.cpp	bbdaa6552d8b750f
+1566	7691	7983918113850986	CMakeFiles/DBMS.dir/recordmanager.cpp.obj	880f7f91ebfc71bd
+1547	7968	7983918113640541	CMakeFiles/DBMS.dir/storagemanager.cpp.obj	5e0298db0c1f652f
+1556	8355	7983918113750291	CMakeFiles/DBMS.dir/schemamanager.cpp.obj	c671ffc00ace1044
+1519	8990	7983918113372133	CMakeFiles/DBMS.dir/DBMS_autogen/mocs_compilation.cpp.obj	75e9ae336b7f2d97
+1527	9834	7983918113445560	CMakeFiles/DBMS.dir/main.cpp.obj	adc9b1be6f423ff7
+1537	11149	7983918113445560	CMakeFiles/DBMS.dir/mainwindow.cpp.obj	6ee1637a298a1f1e
+11150	12801	7983918209685753	DBMS.exe	f7d9f4c2c8c9f9f5

@@ -25,36 +25,11 @@ class StorageManager
 public:
     StorageManager();
 
-    // 阶段一：创建数据库文件夹
-    bool createDatabase(QString dbName);
-
-    /**
-     * @brief 阶段二任务：创建表物理文件并初始化头部信息 [cite: 49]
-     * @param dbName 数据库名称
-     * @param tableName 表名称
-     * @return 成功返回 true，失败返回 false
-     */
-    bool createTable(QString dbName, QString tableName);
-
-    /**
-     * @brief 阶段二任务：创建表物理文件并写入表结构 [cite: 52, 53]
-     * @param dbName 数据库名称
-     * @param tableName 表名称
-     * @param fields 字段列表
-     * @return 成功返回 true，失败返回 false
-     */
-    bool createTable(QString dbName, QString tableName, const QList<Field> &fields);
-
-    // 接口：仅写入 .tdf 定义文件内容
-    bool writeTableDefinition(const QString &dbName, const QString &tableName, const QByteArray &data);
-
-    /**
-     * @brief 读取 .tdf 文件中的表结构
-     * @param dbName 数据库名称
-     * @param tableName 表名称
-     * @return 字段列表，如果失败返回空列表
-     */
-    QList<Field> loadTableSchema(QString dbName, QString tableName);
+    bool createDatabase(const QString &username, const QString &dbName);
+    bool createTable(const QString &username, QString dbName, QString tableName);
+    bool createTable(const QString &username, QString dbName, QString tableName, const QList<Field> &fields);
+    bool writeTableDefinition(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data);
+    QList<Field> loadTableSchema(const QString &username, QString dbName, QString tableName);
 };
 
 #endif // STORAGEMANAGER_H

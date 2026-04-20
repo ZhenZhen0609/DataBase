@@ -9,14 +9,18 @@
 
 StorageManager::StorageManager() {}
 
-bool StorageManager::createDatabase(QString dbName)
+bool StorageManager::createDatabase(const QString &username, const QString &dbName)
 {
     QString rootPath = Config::DATA_PATH;
     QDir dir;
     if (!dir.exists(rootPath)) {
         if (!dir.mkpath(rootPath)) return false;
     }
-    QString dbPath = rootPath + dbName;
+    QString userPath = rootPath + username;
+    if (!dir.exists(userPath)) {
+        if (!dir.mkpath(userPath)) return false;
+    }
+    QString dbPath = userPath + "/" + dbName;
     if (dir.exists(dbPath)) return true;
     if (dir.mkdir(dbPath)) {
         qDebug() << QString("[Storage] Folder \"%1\" created successfully.").arg(dbPath);
@@ -25,9 +29,9 @@ bool StorageManager::createDatabase(QString dbName)
     return false;
 }
 
-bool StorageManager::createTable(QString dbName, QString tableName)
+bool StorageManager::createTable(const QString &username, QString dbName, QString tableName)
 {
-    QString dbPath = Config::DATA_PATH + dbName;
+    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
@@ -75,9 +79,9 @@ bool StorageManager::createTable(QString dbName, QString tableName)
     }
 }
 
-bool StorageManager::writeTableDefinition(const QString &dbName, const QString &tableName, const QByteArray &data)
+bool StorageManager::writeTableDefinition(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data)
 {
-    QString dbPath = Config::DATA_PATH + dbName;
+    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Database folder does not exist:" << dbName;
@@ -97,9 +101,9 @@ bool StorageManager::writeTableDefinition(const QString &dbName, const QString &
     return true;
 }
 
-bool StorageManager::createTable(QString dbName, QString tableName, const QList<Field> &fields)
+bool StorageManager::createTable(const QString &username, QString dbName, QString tableName, const QList<Field> &fields)
 {
-    QString dbPath = Config::DATA_PATH + dbName;
+    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
@@ -142,7 +146,7 @@ bool StorageManager::createTable(QString dbName, QString tableName, const QList<
     QJsonDocument doc(schemaObj);
     QByteArray schemaData = doc.toJson(QJsonDocument::Indented);
 
-    if (!writeTableDefinition(dbName, tableName, schemaData)) {
+    if (!writeTableDefinition(username, dbName, tableName, schemaData)) {
         qDebug() << "[Storage] Error: Failed to write .tdf file.";
         return false;
     }
@@ -171,9 +175,9 @@ bool StorageManager::createTable(QString dbName, QString tableName, const QList<
     return true;
 }
 
-QList<Field> StorageManager::loadTableSchema(QString dbName, QString tableName)
+QList<Field> StorageManager::loadTableSchema(const QString &username, QString dbName, QString tableName)
 {
-    QString tdfPath = Config::DATA_PATH + dbName + "/" + tableName + ".tdf";
+    QString tdfPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".tdf";
     QFile file(tdfPath);
 
     if (!file.exists()) {
