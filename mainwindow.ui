@@ -6,63 +6,239 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>917</width>
-    <height>715</height>
+    <width>960</width>
+    <height>720</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>DBMS 数据库管理系统</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QWidget" name="horizontalLayoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>40</x>
-      <y>80</y>
-      <width>831</width>
-      <height>421</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QTreeView" name="dbTree"/>
-     </item>
-     <item>
-      <widget class="QTabWidget" name="dataTableView">
-       <property name="currentIndex">
-        <number>1</number>
-       </property>
-       <widget class="QWidget" name="tab">
-        <attribute name="title">
-         <string>数据浏览</string>
-        </attribute>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <layout class="QHBoxLayout" name="toolbarLayout">
+      <item>
+       <widget class="QLabel" name="labelDb">
+        <property name="text">
+         <string>数据库:</string>
+        </property>
        </widget>
-       <widget class="QWidget" name="tab_2">
-        <attribute name="title">
-         <string>表结构</string>
-        </attribute>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="inputDbName">
+        <property name="placeholderText">
+         <string>输入数据库名</string>
+        </property>
        </widget>
-      </widget>
-     </item>
-    </layout>
-   </widget>
-   <widget class="QTextEdit" name="logOutput">
-    <property name="geometry">
-     <rect>
-      <x>40</x>
-      <y>520</y>
-      <width>831</width>
-      <height>111</height>
-     </rect>
-    </property>
-   </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnCreateDb">
+        <property name="text">
+         <string>创建数据库</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelUser">
+        <property name="text">
+         <string>用户名:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="inputUsername">
+        <property name="placeholderText">
+         <string>用户名</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelPwd">
+        <property name="text">
+         <string>密码:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="inputPassword">
+        <property name="echoMode">
+         <enum>QLineEdit::Password</enum>
+        </property>
+        <property name="placeholderText">
+         <string>密码</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnLogin">
+        <property name="text">
+         <string>登录</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnRegister">
+        <property name="text">
+         <string>注册</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelWelcome">
+        <property name="text">
+         <string>未登录</string>
+        </property>
+        <property name="styleSheet">
+         <string>color: gray;</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="mainLayout">
+      <item>
+       <layout class="QVBoxLayout" name="leftLayout">
+        <item>
+         <widget class="QLabel" name="labelTree">
+          <property name="text">
+           <string>数据库/表 列表</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTreeWidget" name="dbTree">
+          <property name="minimumWidth">
+           <number>200</number>
+          </property>
+          <column>
+           <property name="text">
+            <string>名称</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="tableButtonLayout">
+          <item>
+           <widget class="QPushButton" name="btnCreateTable">
+            <property name="text">
+             <string>新建表</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnDropTable">
+            <property name="text">
+             <string>删除表</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="rightLayout">
+        <item>
+         <widget class="QTabWidget" name="dataTableView">
+          <property name="currentIndex">
+           <number>0</number>
+          </property>
+          <widget class="QWidget" name="tabData">
+           <attribute name="title">
+            <string>数据浏览</string>
+           </attribute>
+           <layout class="QVBoxLayout" name="dataTabLayout">
+            <item>
+             <layout class="QHBoxLayout" name="recordToolLayout">
+              <item>
+               <widget class="QPushButton" name="btnRefreshData">
+                <property name="text">
+                 <string>刷新数据</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnInsertRecord">
+                <property name="text">
+                 <string>插入记录</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="recordSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QTableWidget" name="tableData">
+              <property name="alternatingRowColors">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="tabSchema">
+           <attribute name="title">
+            <string>表结构</string>
+           </attribute>
+           <layout class="QVBoxLayout" name="schemaTabLayout">
+            <item>
+             <widget class="QPushButton" name="btnRefreshSchema">
+              <property name="text">
+               <string>刷新结构</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTableWidget" name="tableSchema">
+              <property name="alternatingRowColors">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QTextEdit" name="logOutput">
+      <property name="maximumHeight">
+       <number>120</number>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+      <property name="placeholderText">
+       <string>操作日志...</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>917</width>
+     <width>960</width>
      <height>24</height>
     </rect>
    </property>
@@ -70,16 +246,47 @@
     <property name="title">
      <string>数据库</string>
     </property>
+    <addaction name="actionCreateDb"/>
+    <addaction name="actionCreateTable"/>
+    <addaction name="actionDropTable"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menu_2">
     <property name="title">
      <string>帮助</string>
     </property>
+    <addaction name="actionAbout"/>
    </widget>
    <addaction name="menu"/>
    <addaction name="menu_2"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionCreateDb">
+   <property name="text">
+    <string>创建数据库</string>
+   </property>
+  </action>
+  <action name="actionCreateTable">
+   <property name="text">
+    <string>新建表</string>
+   </property>
+  </action>
+  <action name="actionDropTable">
+   <property name="text">
+    <string>删除表</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>退出</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>关于</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>

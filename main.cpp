@@ -15,7 +15,7 @@ void runSchemaTests();
 void runRecordTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
-static const bool RUN_TESTS_ONLY = true;
+static const bool RUN_TESTS_ONLY = false;
 
 int main(int argc, char *argv[])
 {
@@ -162,7 +162,7 @@ void runSchemaTests()
 
     // 先创建测试数据库
     qDebug() << "\n[前置] 创建测试数据库 TestDB";
-    storageManager.createDatabase("TestDB");
+    storageManager.createDatabase("testuser", "TestDB");
 
     // 测试1: 使用新的 saveSchema 接口创建表结构
     qDebug() << "\n[测试1] 使用 saveSchema 创建表结构 (students)";
@@ -173,7 +173,7 @@ void runSchemaTests()
     studentFields.append(Field("name", FieldType::TEXT, 50));
     studentFields.append(Field("age", FieldType::INT, 3));
 
-    bool saveResult = schemaManager.saveSchema("TestDB", "students", studentFields);
+    bool saveResult = schemaManager.saveSchema("testuser", "TestDB", "students", studentFields);
     qDebug() << "保存结果:" << (saveResult ? "成功 ✓" : "失败 ✗");
     if (saveResult) {
         qDebug() << "测试1 通过! 已通过 saveSchema 将字段规则写入 .tdf 文件。";
@@ -186,7 +186,7 @@ void runSchemaTests()
     TableSchema studentSchema;
     studentSchema.tableName = "students";
     studentSchema.fields = studentFields;
-    Response createResult2 = schemaManager.createTable("TestDB", studentSchema);
+    Response createResult2 = schemaManager.createTable("testuser", "TestDB", studentSchema);
     qDebug() << "创建结果: " << (createResult2.status == ResponseStatus::ERROR ? "预期失败 ✓" : "意外成功 ✗");
     if (createResult2.status == ResponseStatus::ERROR) {
         qDebug() << "测试2 通过!";
@@ -196,7 +196,7 @@ void runSchemaTests()
 
     // 测试3: 加载表结构
     qDebug() << "\n[测试3] 加载表结构 (students)";
-    Response loadResult = schemaManager.loadTableSchema("TestDB", "students");
+    Response loadResult = schemaManager.loadTableSchema("testuser", "TestDB", "students");
     qDebug() << "加载结果: " << (loadResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     if (loadResult.status == ResponseStatus::OK) {
         TableSchema loadedSchema = loadResult.data.value<TableSchema>();
@@ -209,7 +209,7 @@ void runSchemaTests()
 
     // 测试4: 加载不存在的表
     qDebug() << "\n[测试4] 加载不存在的表 (nonexistent)";
-    Response loadResult2 = schemaManager.loadTableSchema("TestDB", "nonexistent");
+    Response loadResult2 = schemaManager.loadTableSchema("testuser", "TestDB", "nonexistent");
     qDebug() << "加载结果: " << (loadResult2.status == ResponseStatus::TABLE_NOT_FOUND ? "预期失败 ✓" : "意外成功 ✗");
     if (loadResult2.status == ResponseStatus::TABLE_NOT_FOUND) {
         qDebug() << "测试4 通过!";
@@ -219,7 +219,7 @@ void runSchemaTests()
 
     // 测试5: 加载所有表
     qDebug() << "\n[测试5] 加载所有表";
-    Response loadAllResult = schemaManager.loadTables("TestDB");
+    Response loadAllResult = schemaManager.loadTables("testuser", "TestDB");
     qDebug() << "加载结果: " << (loadAllResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     if (loadAllResult.status == ResponseStatus::OK) {
         QList<TableSchema> schemas = loadAllResult.data.value<QList<TableSchema>>();
@@ -231,7 +231,7 @@ void runSchemaTests()
 
     // 测试6: 删除表
     qDebug() << "\n[测试6] 删除表 (students)";
-    Response dropResult = schemaManager.dropTable("TestDB", "students");
+    Response dropResult = schemaManager.dropTable("testuser", "TestDB", "students");
     qDebug() << "删除结果: " << (dropResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     if (dropResult.status == ResponseStatus::OK) {
         qDebug() << "测试6 通过!";
@@ -241,7 +241,7 @@ void runSchemaTests()
 
     // 测试7: 删除不存在的表
     qDebug() << "\n[测试7] 删除不存在的表 (students)";
-    Response dropResult2 = schemaManager.dropTable("TestDB", "students");
+    Response dropResult2 = schemaManager.dropTable("testuser", "TestDB", "students");
     qDebug() << "删除结果: " << (dropResult2.status == ResponseStatus::TABLE_NOT_FOUND ? "预期失败 ✓" : "意外成功 ✗");
     if (dropResult2.status == ResponseStatus::TABLE_NOT_FOUND) {
         qDebug() << "测试7 通过!";
@@ -271,14 +271,14 @@ void runRecordTests()
 
     // 先创建测试数据库和表
     qDebug() << "\n[前置] 创建测试数据库 Student_System";
-    storageManager.createDatabase("Student_System");
+    storageManager.createDatabase("testuser", "Student_System");
 
     // 创建表结构
     TableSchema studentSchema;
     studentSchema.tableName = "test";
     studentSchema.fields.append(Field("id", FieldType::INT, 10));
     studentSchema.fields.append(Field("name", FieldType::TEXT, 50));
-    schemaManager.createTable("Student_System", studentSchema);
+    schemaManager.createTable("testuser", "Student_System", studentSchema);
 
     // 测试1: 插入第一条记录
     qDebug() << "\n[测试1] 插入第一条记录 (张三, 20岁)";
@@ -287,7 +287,7 @@ void runRecordTests()
     record1["name"] = "张三";
     record1["age"] = 20;
 
-    Response insertResult1 = recordManager.insertRecord("Student_System", "test", record1);
+    Response insertResult1 = recordManager.insertRecord("testuser", "Student_System", "test", record1);
     qDebug() << "插入结果: " << (insertResult1.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     qDebug() << "消息: " << insertResult1.message;
     if (insertResult1.status == ResponseStatus::OK) {
@@ -303,7 +303,7 @@ void runRecordTests()
     record2["name"] = "李四";
     record2["age"] = 22;
 
-    Response insertResult2 = recordManager.insertRecord("Student_System", "test", record2);
+    Response insertResult2 = recordManager.insertRecord("testuser", "Student_System", "test", record2);
     qDebug() << "插入结果: " << (insertResult2.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     qDebug() << "消息: " << insertResult2.message;
     if (insertResult2.status == ResponseStatus::OK) {
@@ -314,7 +314,7 @@ void runRecordTests()
 
     // 测试3: 查询所有记录
     qDebug() << "\n[测试3] 查询所有记录";
-    Response selectResult = recordManager.selectAllRecords("Student_System", "test");
+    Response selectResult = recordManager.selectAllRecords("testuser", "Student_System", "test");
     qDebug() << "查询结果: " << (selectResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     if (selectResult.status == ResponseStatus::OK) {
         QJsonArray records = selectResult.data.toJsonArray();
@@ -331,7 +331,7 @@ void runRecordTests()
 
     // 测试4: 查询不存在的表
     qDebug() << "\n[测试4] 查询不存在的表 (nonexistent)";
-    Response selectResult2 = recordManager.selectAllRecords("Student_System", "nonexistent");
+    Response selectResult2 = recordManager.selectAllRecords("testuser", "Student_System", "nonexistent");
     qDebug() << "查询结果: " << (selectResult2.status == ResponseStatus::TABLE_NOT_FOUND ? "预期失败 ✓" : "意外成功 ✗");
     if (selectResult2.status == ResponseStatus::TABLE_NOT_FOUND) {
         qDebug() << "测试4 通过!";

@@ -1,0 +1,34 @@
+{
+    "fieldCount": 4,
+    "fields": [
+        {
+            "isNotNull": true,
+            "isPrimaryKey": true,
+            "length": 255,
+            "name": "2",
+            "type": 0
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 255,
+            "name": "3",
+            "type": 2
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 255,
+            "name": "4",
+            "type": 0
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 255,
+            "name": "5",
+            "type": 1
+        }
+    ],
+    "tableName": "22222"
+}

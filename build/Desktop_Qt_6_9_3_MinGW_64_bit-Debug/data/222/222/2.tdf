@@ -1,0 +1,13 @@
+{
+    "fieldCount": 1,
+    "fields": [
+        {
+            "isNotNull": true,
+            "isPrimaryKey": true,
+            "length": 255,
+            "name": "aaa",
+            "type": 0
+        }
+    ],
+    "tableName": "2"
+}
