@@ -13,6 +13,7 @@
 void runAuthTests();
 void runSchemaTests();
 void runRecordTests();
+void runStorageTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
 static const bool RUN_TESTS_ONLY = false;
@@ -42,6 +43,7 @@ int main(int argc, char *argv[])
         runAuthTests();
         runSchemaTests();
         runRecordTests();
+        runStorageTests();
 
         qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
         qDebug() << "║                      所有测试执行完成                            ║";
@@ -355,4 +357,93 @@ void runRecordTests()
     qDebug() << "║  阶段一 🔵蓝圈C + 阶段二 🔵蓝圈C - 记录管理器测试完成            ║";
     qDebug() << "║  备注: 当前使用JSON格式(.json)，阶段二需改为.trd二进制格式        ║";
     qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 存储管理器测试（阶段三 🔴红圈A）
+void runStorageTests()
+{
+    StorageManager storageManager;
+    QString testUser = "admin";
+    QString testDB = "DropTestDB";
+    QString testTable = "TempTable";
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段三 🔴红圈A - 存储管理器测试                                 ║";
+    qDebug() << "║  模块: StorageManager 生命周期管理 (Drop操作)                    ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 前置准备：先造点文件出来才能删
+    qDebug() << "\n[前置] 创建测试环境...";
+    storageManager.createDatabase(testUser, testDB);
+    storageManager.createTable(testUser, testDB, testTable);
+
+    // 测试1：删除表
+    qDebug() << "\n[测试1] 测试删除表物理文件 (dropTable)";
+    bool dropTableResult = storageManager.dropTable(testUser, testDB, testTable);
+    qDebug() << "删除表结果: " << (dropTableResult ? "成功 ✓" : "失败 ✗");
+    if (dropTableResult) {
+        qDebug() << "测试1 通过! .tdf 和 .trd 文件已被物理删除。";
+    } else {
+        qDebug() << "测试1 失败!";
+    }
+
+    // 测试2：删除整个数据库
+    qDebug() << "\n[测试2] 测试删除整个数据库文件夹 (dropDatabase)";
+    bool dropDBResult = storageManager.dropDatabase(testUser, testDB);
+    qDebug() << "删除数据库结果: " << (dropDBResult ? "成功 ✓" : "失败 ✗");
+    if (dropDBResult) {
+        qDebug() << "测试2 通过! 数据库文件夹已彻底清空并移除。";
+    } else {
+        qDebug() << "测试2 失败!";
+    }
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段三 🔴红圈A - 存储管理器测试完成                             ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝\n";
+
+    // 测试3：修改表结构 (Alter Table)
+    qDebug() << "\n[测试3] 测试表结构变更 (alterTable)";
+
+    // 先建一个全新的测试库和表
+    QString alterDB = "AlterTestDB";
+    storageManager.createDatabase(testUser, alterDB);
+    QList<Field> initialFields;
+    initialFields.append(Field("id", FieldType::INT, 10)); // 初始只有1个字段
+    storageManager.createTable(testUser, alterDB, "MyTable", initialFields);
+
+    // 模拟橙圈B要求增加一个 "name" 字段
+    QList<Field> newFields = initialFields;
+    newFields.append(Field("name", FieldType::TEXT, 50));
+
+    // 执行变更
+    bool alterResult = storageManager.alterTable(testUser, alterDB, "MyTable", newFields);
+
+    // 验证变更是否成功写入了文件
+    QList<Field> loadedFields = storageManager.loadTableSchema(testUser, alterDB, "MyTable");
+
+    qDebug() << "修改表结构结果: " << (alterResult ? "成功 ✓" : "失败 ✗");
+    if (alterResult && loadedFields.size() == 2 && loadedFields[1].name == "name") {
+        qDebug() << "测试3 通过! .tdf 已成功重写，新字段已生效，当前字段数: " << loadedFields.size();
+    } else {
+        qDebug() << "测试3 失败!";
+    }
+
+    // 测试4：验证日志系统是否成功记录 (Student ID: 24301132)
+    qDebug() << "\n[测试4] 验证日志系统 (检查 ruanko.log 内容)";
+    QString logPath = "./data/" + testUser + "/" + alterDB + "/ruanko.log";
+    QFile logFile(logPath);
+
+    if (logFile.exists() && logFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "---------------- ruanko.log ----------------";
+        // 使用 .noquote() 防止输出时带上多余的换行符和引号
+        qDebug().noquote() << logFile.readAll().trimmed();
+        qDebug() << "--------------------------------------------";
+        logFile.close();
+        qDebug() << "测试4 通过! 日志生成并读取成功 ✓";
+    } else {
+        qDebug() << "测试4 失败 ✗ 无法找到或打开日志文件。";
+    }
+
+    // 打扫战场（把测试用的数据库删掉）
+    storageManager.dropDatabase(testUser, alterDB);
 }

@@ -22,6 +22,12 @@
 
 class StorageManager
 {
+private:
+    /**
+     * @brief 内部辅助函数：向指定数据库的 ruanko.log 中追加日志
+     */
+    void writeLog(const QString &username, const QString &dbName, const QString &logMessage);
+
 public:
     StorageManager();
 
@@ -30,6 +36,13 @@ public:
     bool createTable(const QString &username, QString dbName, QString tableName, const QList<Field> &fields);
     bool writeTableDefinition(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data);
     QList<Field> loadTableSchema(const QString &username, QString dbName, QString tableName);
+
+    // 删除表物理文件
+    bool dropTable(const QString &username, const QString &dbName, const QString &tableName);
+    // 删除整个数据库文件夹
+    bool dropDatabase(const QString &username, const QString &dbName);
+    // 表结构变更 (修改字段)
+    bool alterTable(const QString &username, const QString &dbName, const QString &tableName, const QList<Field> &newFields);
 };
 
 #endif // STORAGEMANAGER_H
