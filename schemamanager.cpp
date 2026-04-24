@@ -193,3 +193,72 @@ Response SchemaManager::dropTable(const QString &username, const QString &dbName
 
     return {ResponseStatus::OK, QString("[Schema] Table '%1' dropped successfully").arg(tableName), QVariant()};
 }
+
+Response SchemaManager::validateAndFillRecord(const TableSchema &schema,
+                                              const QJsonArray &existingRecords,
+                                              QJsonObject &record) const
+{
+    // 1. 默认值填充与类型校验
+    for (const Field &field : schema.fields) {
+        QVariant value = record.value(field.name).toVariant();
+
+        // 如果缺失或为空，则填充默认值
+        if (!record.contains(field.name) || value.isNull() || (value.type() == QVariant::String && value.toString().isEmpty())) {
+            switch (field.type) {
+            case FieldType::INT:     record[field.name] = 0; break;
+            case FieldType::DOUBLE:  record[field.name] = 0.0; break;
+            case FieldType::BOOLEAN: record[field.name] = false; break;
+            case FieldType::TEXT:    record[field.name] = ""; break;
+            }
+            continue; // 默认值直接视为合法，跳过类型校验
+        }
+
+        // 类型强校验
+        if (!validateField(field, value)) {
+            return {ResponseStatus::FIELD_MISMATCH,
+                    QString("[Schema] 字段 '%1' 的值类型不匹配，期望 %2")
+                        .arg(field.name)
+                        .arg(field.type == FieldType::INT ? "INT" :
+                                 field.type == FieldType::DOUBLE ? "DOUBLE" :
+                                 field.type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT"),
+                    QVariant()};
+        }
+    }
+
+    // 2. 主键唯一性检查
+    // 收集所有主键字段
+    QStringList pkFields;
+    for (const Field &field : schema.fields) {
+        if (field.isPrimaryKey) {
+            pkFields.append(field.name);
+        }
+    }
+
+    if (!pkFields.isEmpty()) {
+        // 构建当前记录的主键值对（QJsonObject 用于对比）
+        QJsonObject newPkValues;
+        for (const QString &key : pkFields) {
+            newPkValues[key] = record[key];
+        }
+
+        // 遍历已有记录，检查主键是否重复
+        for (const QJsonValue &val : existingRecords) {
+            QJsonObject existingRecord = val.toObject();
+            bool conflict = true;
+            for (const QString &key : pkFields) {
+                if (existingRecord[key] != newPkValues[key]) {
+                    conflict = false;
+                    break;
+                }
+            }
+            if (conflict) {
+                return {ResponseStatus::ERROR,
+                        QString("[Schema] 主键冲突：'%1' 的值已存在")
+                            .arg(pkFields.join(", ")),
+                        QVariant()};
+            }
+        }
+    }
+
+    return {ResponseStatus::OK, "[Schema] 记录校验通过", QVariant()};
+}

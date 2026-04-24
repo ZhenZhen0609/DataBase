@@ -22,6 +22,16 @@ public:
     Response loadTableSchema(const QString &username, const QString &dbName, const QString &tableName);
     Response dropTable(const QString &username, const QString &dbName, const QString &tableName);
 
+    /**
+     * @brief 对即将插入的记录进行完整性审查：默认值填充、类型校验、主键唯一性检查
+     * @param schema 当前表的字段定义
+     * @param existingRecords 表中已有记录（JSON 数组）
+     * @param record 待插入的记录，校验通过后会被填充默认值
+     * @return 审查结果，OK 表示通过，其它为具体错误
+     */
+    Response validateAndFillRecord(const TableSchema &schema,const QJsonArray &existingRecords,QJsonObject &record) const;
+
+
 private:
     bool ensureDbDirectory(const QString &username, const QString &dbName) const;
     QByteArray serializeSchema(const QList<Field> &fields) const;
