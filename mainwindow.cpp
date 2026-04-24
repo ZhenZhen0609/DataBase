@@ -300,12 +300,62 @@ void MainWindow::onInsertRecord()
     for (int i = 0; i < schema.fields.size(); ++i) {
         const Field &f = schema.fields[i];
         QString val = edits[i]->text().trimmed();
-        if (f.type == FieldType::INT)          record[f.name] = val.toInt();
-        else if (f.type == FieldType::DOUBLE)  record[f.name] = val.toDouble();
-        else if (f.type == FieldType::BOOLEAN) record[f.name] = (val.toLower() == "true");
-        else                                   record[f.name] = val;
+
+        if (val.isEmpty()) continue;   // 交给validateAndFillRecord填默认值
+
+        if (f.type == FieldType::INT) {
+            bool ok;
+            int intVal = val.toInt(&ok);
+            if (!ok) {
+                QString err = QString("字段 '%1' 需要整数，输入 '%2' 无效").arg(f.name, val);
+                log("[Schema] " + err);
+                QMessageBox::warning(this, "数据类型错误", err);
+                return;   // 直接中止插入
+            }
+            record[f.name] = intVal;
+        } else if (f.type == FieldType::DOUBLE) {
+            bool ok;
+            double dVal = val.toDouble(&ok);
+            if (!ok) {
+                QString err = QString("字段 '%1' 需要小数，输入 '%2' 无效").arg(f.name, val);
+                log("[Schema] " + err);
+                QMessageBox::warning(this, "数据类型错误", err);
+                return;
+            }
+            record[f.name] = dVal;
+        } else if (f.type == FieldType::BOOLEAN) {
+            QString lower = val.toLower();
+            if (lower == "true" || lower == "1")        record[f.name] = true;
+            else if (lower == "false" || lower == "0") record[f.name] = false;
+            else {
+                QString err = QString("字段 '%1' 需要布尔值 (true/false)，输入 '%2' 无效").arg(f.name, val);
+                log("[Schema] " + err);
+                QMessageBox::warning(this, "数据类型错误", err);
+                return;
+            }
+        } else {
+            record[f.name] = val;   // TEXT直接保留
+        }
     }
 
+    // 审查：获取现有记录并进行校验/填充
+    QJsonArray existingRecords;
+    Response existingResp = m_record->selectAllRecords(m_currentUser, m_currentDb, m_currentTable);
+    if (existingResp.status == ResponseStatus::OK) {
+        existingRecords = existingResp.data.toJsonArray();
+    } else if (existingResp.status != ResponseStatus::TABLE_NOT_FOUND) {
+        log(existingResp.message);
+        QMessageBox::warning(this, "查询失败", "无法读取现有记录，请稍后重试");
+        return;
+    }
+
+    Response validResp = m_schema->validateAndFillRecord(schema, existingRecords, record);
+    if (validResp.status != ResponseStatus::OK) {
+        log(validResp.message);
+        QMessageBox::warning(this, "数据校验失败", validResp.message);
+        return;
+    }
+    // 审查通过，继续插入
     Response r = m_record->insertRecord(m_currentUser, m_currentDb, m_currentTable, record);
     log(r.message);
     if (r.status == ResponseStatus::OK)
