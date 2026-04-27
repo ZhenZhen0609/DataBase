@@ -30,6 +30,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 数据库按钮
     connect(ui->btnCreateDb, &QPushButton::clicked, this, &MainWindow::onCreateDatabase);
+    connect(ui->btnDropDb, &QPushButton::clicked, this, &MainWindow::onDropDatabase);
 
     // 表管理按钮
     connect(ui->btnCreateTable, &QPushButton::clicked, this, &MainWindow::onCreateTable);
@@ -498,4 +499,36 @@ void MainWindow::showSchemaTable(const QString &username, const QString &dbName,
     }
 
     ui->dataTableView->setCurrentIndex(1);
+}
+
+
+void MainWindow::onDropDatabase()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+
+    QString dbName = ui->inputDbName->text().trimmed();
+    if (dbName.isEmpty()) {
+        dbName = QInputDialog::getText(this, "删除数据库", "数据库名称:");
+        if (dbName.trimmed().isEmpty()) return;
+        dbName = dbName.trimmed();
+    }
+
+    int ret = QMessageBox::question(this, "确认删除",
+        QString("确定要删除数据库 \"%1\" 吗？此操作将删除所有表和数据，不可恢复！").arg(dbName));
+    if (ret != QMessageBox::Yes) return;
+
+    if (m_storage->dropDatabase(m_currentUser, dbName)) {
+        log(QString("[Storage] 数据库 \"%1\" 删除成功").arg(dbName));
+        if (m_currentDb == dbName) {
+            m_currentDb.clear();
+            m_currentTable.clear();
+            ui->tableData->clearContents();
+            ui->tableData->setRowCount(0);
+            ui->tableSchema->clearContents();
+            ui->tableSchema->setRowCount(0);
+        }
+        refreshTree();
+    } else {
+        log(QString("[Storage] 数据库 \"%1\" 删除失败").arg(dbName));
+    }
 }

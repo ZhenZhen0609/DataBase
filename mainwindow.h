@@ -27,6 +27,7 @@ private slots:
 
     // 数据库
     void onCreateDatabase();
+    void onDropDatabase();
 
     // 表管理
     void onCreateTable();

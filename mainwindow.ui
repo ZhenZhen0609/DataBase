@@ -39,6 +39,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QPushButton" name="btnDropDb">
+        <property name="text">
+         <string>删除数据库</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
