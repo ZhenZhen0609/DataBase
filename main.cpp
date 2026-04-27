@@ -3,6 +3,7 @@
 #include "SchemaManager.h"
 #include "recordmanager.h"
 #include "storagemanager.h"
+#include "sqlparser.h"
 
 #include <QApplication>
 #include <QDebug>
@@ -14,9 +15,10 @@ void runAuthTests();
 void runSchemaTests();
 void runRecordTests();
 void runStorageTests();
+void runSQLParserTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
-static const bool RUN_TESTS_ONLY = false;
+static const bool RUN_TESTS_ONLY = true;
 
 int main(int argc, char *argv[])
 {
@@ -44,6 +46,7 @@ int main(int argc, char *argv[])
         runSchemaTests();
         runRecordTests();
         runStorageTests();
+        runSQLParserTests();
 
         qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
         qDebug() << "║                      所有测试执行完成                            ║";
@@ -463,4 +466,51 @@ void runStorageTests()
 
     // 打扫战场（把测试用的数据库删掉）
     storageManager.dropDatabase(testUser, alterDB);
+}
+
+void runSQLParserTests() {
+    StorageManager storage;
+    SQLParser parser;
+    parser.setStorageManager(&storage);
+    parser.setCurrentUser("admin");   // 默认用户
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段四 🟠橙圈B - SQL解析器测试                                 ║";
+    qDebug() << "║  模块: SQLParser + StorageManager                              ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 测试1：创建数据库
+    qDebug() << "\n[测试1] 解析并执行: CREATE DATABASE TestSQLDB;";
+    Response res1 = parser.parseSQL("CREATE DATABASE TestSQLDB;");
+    qDebug() << "状态:" << (res1.status == ResponseStatus::OK ? "OK" : "ERROR") << ", 消息:" << res1.message;
+
+    // 测试2：重复创建同一数据库（应失败）
+    qDebug() << "\n[测试2] 重复创建: CREATE DATABASE TestSQLDB;";
+    Response res2 = parser.parseSQL("CREATE DATABASE TestSQLDB;");
+    qDebug() << "状态:" << (res2.status == ResponseStatus::OK ? "OK" : "ERROR") << ", 消息:" << res2.message;
+
+    // 测试3：在当前数据库下创建表（必须先设置当前数据库）
+    qDebug() << "\n[测试3] 设置当前数据库为 TestSQLDB，然后创建表";
+    parser.setCurrentDatabase("TestSQLDB");
+    Response res3 = parser.parseSQL("CREATE TABLE students (id INT, name TEXT, age INT);");
+    qDebug() << "状态:" << (res3.status == ResponseStatus::OK ? "OK" : "ERROR") << ", 消息:" << res3.message;
+
+    // 测试4：错误语法
+    qDebug() << "\n[测试4] 错误语法: CREAT TABLE x (a INT);";
+    Response res4 = parser.parseSQL("CREAT TABLE x (a INT);");
+    qDebug() << "状态:" << (res4.status == ResponseStatus::OK ? "OK" : "ERROR") << ", 消息:" << res4.message;
+
+    // 测试5：删除表
+    qDebug() << "\n[测试5] 删除表: DROP TABLE students;";
+    Response res5 = parser.parseSQL("DROP TABLE students;");
+    qDebug() << "状态:" << (res5.status == ResponseStatus::OK ? "OK" : "ERROR") << ", 消息:" << res5.message;
+
+    // 测试6：删除数据库
+    qDebug() << "\n[测试6] 删除数据库: DROP DATABASE TestSQLDB;";
+    Response res6 = parser.parseSQL("DROP DATABASE TestSQLDB;");
+    qDebug() << "状态:" << (res6.status == ResponseStatus::OK ? "OK" : "ERROR") << ", 消息:" << res6.message;
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段四 🟠橙圈B - SQL解析器测试完成                             ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
 }
