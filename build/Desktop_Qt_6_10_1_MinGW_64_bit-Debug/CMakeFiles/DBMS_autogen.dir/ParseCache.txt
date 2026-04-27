@@ -1150,11 +1150,11 @@ E:/DB/DataBase/schemamanager.h
  mdp:E:/DB/DataBase/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/DBMS_autogen/moc_predefs.h
  mdp:E:/DB/DataBase/common.h
  mdp:E:/DB/DataBase/schemamanager.h
-E:/DB/DataBase/storagemanager.h
 E:/DB/DataBase/authmanager.cpp
-E:/DB/DataBase/main.cpp
+E:/DB/DataBase/storagemanager.h
 E:/DB/DataBase/mainwindow.cpp
  uic:./ui_mainwindow.h
+E:/DB/DataBase/main.cpp
 E:/DB/DataBase/recordmanager.cpp
 E:/DB/DataBase/schemamanager.cpp
 E:/DB/DataBase/storagemanager.cpp

@@ -444,6 +444,23 @@ void runStorageTests()
         qDebug() << "测试4 失败 ✗ 无法找到或打开日志文件。";
     }
 
+    // 测试5：重复创建相同数据库的拦截测试
+    qDebug() << "\n[测试5] 测试重复创建数据库 (拦截验证)";
+    QString dupDB = "DupTestDB";
+
+    // 第一次建库，应该成功
+    storageManager.createDatabase(testUser, dupDB);
+
+    // 第二次建同名库，应该触发我们刚才写的拦截逻辑，返回 false
+    bool dupResult = storageManager.createDatabase(testUser, dupDB);
+
+    qDebug() << "重复建库结果: " << (!dupResult ? "预期失败 ✓" : "意外成功 ✗");
+    if (!dupResult) {
+        qDebug() << "测试5 通过! 成功拦截了重复建库操作。";
+    } else {
+        qDebug() << "测试5 失败! 代码依然返回了 true，请检查刚才的修改。";
+    }
+
     // 打扫战场（把测试用的数据库删掉）
     storageManager.dropDatabase(testUser, alterDB);
 }
