@@ -175,31 +175,6 @@ void MainWindow::onCreateDatabase()
     }
 }
 
-void MainWindow::onDropDatabase()
-{
-    if (!m_loggedIn) return requireLogin();
-
-    QString dbName = ui->inputDbName->text().trimmed();
-    if (dbName.isEmpty()) {
-        log("请输入要删除的数据库名");
-        return;
-    }
-
-    if (QMessageBox::question(this, "确认", "确定删除数据库 " + dbName + "？") != QMessageBox::Yes)
-        return;
-
-    if (m_storage->dropDatabase(m_currentUser, dbName)) {
-        log("数据库已删除: " + dbName);
-        if (m_currentDb == dbName) {
-            m_currentDb.clear();
-            m_currentTable.clear();
-        }
-        refreshTree();
-    } else {
-        log("数据库删除失败");
-    }
-}
-
 void MainWindow::onCreateTable()
 {
     if (!m_loggedIn) return requireLogin();
