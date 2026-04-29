@@ -2,3 +2,4 @@
 #include "EWIEGA46WW/moc_authmanager.cpp"
 #include "EWIEGA46WW/moc_mainwindow.cpp"
 #include "EWIEGA46WW/moc_schemamanager.cpp"
+#include "EWIEGA46WW/moc_sqlparser.cpp"

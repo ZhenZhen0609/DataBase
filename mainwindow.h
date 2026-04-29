@@ -7,6 +7,7 @@
 #include "schemamanager.h"
 #include "recordmanager.h"
 #include "storagemanager.h"
+#include "sqlparser.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -32,11 +33,15 @@ private slots:
     // 表管理
     void onCreateTable();
     void onDropTable();
+    void onAlterTable();
 
     // 数据操作
     void onRefreshData();
     void onInsertRecord();
     void onRefreshSchema();
+
+    // SQL解析
+    void onExecuteSQL();
 
     // 树节点选中
     void onTreeItemClicked(QTreeWidgetItem *item, int column);
@@ -51,6 +56,7 @@ private:
     SchemaManager *m_schema;
     RecordManager *m_record;
     StorageManager *m_storage;
+    SQLParser     *m_parser;
 
     QString m_currentUser;
     QString m_currentDb;

@@ -148,6 +148,13 @@
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QPushButton" name="btnAlterTable">
+            <property name="text">
+             <string>修改表</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </item>
        </layout>
@@ -219,6 +226,34 @@
             </item>
            </layout>
           </widget>
+          <widget class="QWidget" name="tabSQL">
+           <attribute name="title">
+            <string>SQL执行</string>
+           </attribute>
+           <layout class="QVBoxLayout" name="sqlTabLayout">
+            <item>
+             <widget class="QLabel" name="labelSQL">
+              <property name="text">
+               <string>输入SQL语句 (支持: CREATE/DROP DATABASE/TABLE)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTextEdit" name="sqlInput">
+              <property name="placeholderText">
+               <string>例如: CREATE DATABASE mydb; 或 CREATE TABLE users (id INT, name TEXT);</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnExecuteSQL">
+              <property name="text">
+               <string>执行SQL</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
        </layout>
@@ -256,6 +291,7 @@
     <addaction name="actionCreateDb"/>
     <addaction name="actionCreateTable"/>
     <addaction name="actionDropTable"/>
+    <addaction name="actionAlterTable"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -282,6 +318,11 @@
   <action name="actionDropTable">
    <property name="text">
     <string>删除表</string>
+   </property>
+  </action>
+  <action name="actionAlterTable">
+   <property name="text">
+    <string>修改表</string>
    </property>
   </action>
   <action name="actionExit">

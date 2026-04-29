@@ -1,0 +1,20 @@
+{
+    "fieldCount": 2,
+    "fields": [
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 10,
+            "name": "id",
+            "type": 0
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 50,
+            "name": "name",
+            "type": 1
+        }
+    ],
+    "tableName": "test"
+}

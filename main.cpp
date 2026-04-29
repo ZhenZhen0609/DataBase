@@ -18,7 +18,7 @@ void runStorageTests();
 void runSQLParserTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
-static const bool RUN_TESTS_ONLY = true;
+static const bool RUN_TESTS_ONLY = false;
 
 int main(int argc, char *argv[])
 {
