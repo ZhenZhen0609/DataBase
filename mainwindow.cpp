@@ -40,6 +40,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnDropTable,   &QPushButton::clicked, this, &MainWindow::onDropTable);
     connect(ui->btnAlterTable,  &QPushButton::clicked, this, &MainWindow::onAlterTable);
 
+    // 字段操作按钮
+    connect(ui->btnAddField,  &QPushButton::clicked, this, &MainWindow::onAddField);
+    connect(ui->btnDropField, &QPushButton::clicked, this, &MainWindow::onDropField);
+    connect(ui->btnAlterField, &QPushButton::clicked, this, &MainWindow::onAlterField);
+
     // 数据操作按钮
     connect(ui->btnRefreshData,   &QPushButton::clicked, this, &MainWindow::onRefreshData);
     connect(ui->btnInsertRecord,  &QPushButton::clicked, this, &MainWindow::onInsertRecord);
@@ -60,6 +65,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionCreateTable, &QAction::triggered, this, &MainWindow::onCreateTable);
     connect(ui->actionDropTable,   &QAction::triggered, this, &MainWindow::onDropTable);
     connect(ui->actionAlterTable,  &QAction::triggered, this, &MainWindow::onAlterTable);
+    connect(ui->actionAddField,    &QAction::triggered, this, &MainWindow::onAddField);
+    connect(ui->actionDropField,   &QAction::triggered, this, &MainWindow::onDropField);
+    connect(ui->actionAlterField,  &QAction::triggered, this, &MainWindow::onAlterField);
     connect(ui->actionExit,        &QAction::triggered, this, &QWidget::close);
     connect(ui->actionAbout,       &QAction::triggered, this, &MainWindow::onAbout);
 
@@ -298,6 +306,189 @@ void MainWindow::onAlterTable()
         onRefreshSchema();
     } else {
         log("表结构修改失败");
+    }
+}
+
+void MainWindow::onAddField()
+{
+    if (!m_loggedIn) return requireLogin();
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("请先选择表");
+        return;
+    }
+
+    // 加载当前表结构
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (fields.isEmpty()) {
+        log("无法加载表结构");
+        return;
+    }
+
+    // 显示当前字段
+    QString currentFields;
+    for (const Field &f : fields) {
+        currentFields += f.name + " " +
+            (f.type == FieldType::INT ? "INT" :
+             f.type == FieldType::DOUBLE ? "DOUBLE" :
+             f.type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT") + ", ";
+    }
+    currentFields.chop(2);
+
+    // 输入新字段
+    bool ok;
+    QString newFieldStr = QInputDialog::getText(this, "添加字段",
+        "当前字段:\n" + currentFields + "\n\n输入新字段定义 (格式: 字段名 类型):",
+        QLineEdit::Normal, "", &ok);
+    if (!ok) return;
+
+    QStringList pair = newFieldStr.trimmed().split(' ', Qt::SkipEmptyParts);
+    if (pair.size() < 2) {
+        log("字段定义格式错误");
+        return;
+    }
+
+    Field newField;
+    newField.name = pair[0];
+    newField.type = pair[1].toUpper() == "INT" ? FieldType::INT :
+                    pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
+                    pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
+    newField.length = (newField.type == FieldType::INT) ? 10 : 255;
+
+    fields.append(newField);
+
+    if (m_storage->alterTable(m_currentUser, m_currentDb, m_currentTable, fields)) {
+        log("字段添加成功: " + newField.name);
+        onRefreshSchema();
+    } else {
+        log("字段添加失败");
+    }
+}
+
+void MainWindow::onDropField()
+{
+    if (!m_loggedIn) return requireLogin();
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("请先选择表");
+        return;
+    }
+
+    // 加载当前表结构
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (fields.isEmpty()) {
+        log("无法加载表结构");
+        return;
+    }
+
+    // 显示当前字段并选择要删除的字段
+    QStringList fieldNames;
+    for (const Field &f : fields) {
+        fieldNames.append(f.name);
+    }
+
+    bool ok;
+    QString fieldName = QInputDialog::getItem(this, "删除字段", "选择要删除的字段:", fieldNames, 0, false, &ok);
+    if (!ok || fieldName.isEmpty()) return;
+
+    // 检查是否是主键字段
+    for (const Field &f : fields) {
+        if (f.name == fieldName && f.isPrimaryKey) {
+            QMessageBox::warning(this, "错误", "不能删除主键字段");
+            return;
+        }
+    }
+
+    // 过滤掉要删除的字段
+    QList<Field> newFields;
+    for (const Field &f : fields) {
+        if (f.name != fieldName) {
+            newFields.append(f);
+        }
+    }
+
+    if (m_storage->alterTable(m_currentUser, m_currentDb, m_currentTable, newFields)) {
+        log("字段删除成功: " + fieldName);
+        onRefreshSchema();
+    } else {
+        log("字段删除失败");
+    }
+}
+
+void MainWindow::onAlterField()
+{
+    if (!m_loggedIn) return requireLogin();
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("请先选择表");
+        return;
+    }
+
+    // 加载当前表结构
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (fields.isEmpty()) {
+        log("无法加载表结构");
+        return;
+    }
+
+    // 显示当前字段并选择要修改的字段
+    QStringList fieldNames;
+    for (const Field &f : fields) {
+        fieldNames.append(f.name);
+    }
+
+    bool ok;
+    QString fieldName = QInputDialog::getItem(this, "修改字段", "选择要修改的字段:", fieldNames, 0, false, &ok);
+    if (!ok || fieldName.isEmpty()) return;
+
+    // 找到要修改的字段
+    Field *targetField = nullptr;
+    for (Field &f : fields) {
+        if (f.name == fieldName) {
+            targetField = &f;
+            break;
+        }
+    }
+
+    if (!targetField) {
+        log("字段不存在");
+        return;
+    }
+
+    // 显示当前字段信息
+    QString currentInfo = QString("字段名: %1\n类型: %2\n长度: %3\n非空: %4\n主键: %5")
+        .arg(targetField->name)
+        .arg(targetField->type == FieldType::INT ? "INT" :
+             targetField->type == FieldType::DOUBLE ? "DOUBLE" :
+             targetField->type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT")
+        .arg(targetField->length)
+        .arg(targetField->isNotNull ? "是" : "否")
+        .arg(targetField->isPrimaryKey ? "是" : "否");
+
+    // 输入新字段信息
+    QString newFieldStr = QInputDialog::getText(this, "修改字段",
+        currentInfo + "\n\n输入新字段定义 (格式: 字段名 类型):",
+        QLineEdit::Normal, fieldName + " " +
+        (targetField->type == FieldType::INT ? "INT" :
+         targetField->type == FieldType::DOUBLE ? "DOUBLE" :
+         targetField->type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT"), &ok);
+    if (!ok) return;
+
+    QStringList pair = newFieldStr.trimmed().split(' ', Qt::SkipEmptyParts);
+    if (pair.size() < 2) {
+        log("字段定义格式错误");
+        return;
+    }
+
+    // 更新字段
+    targetField->name = pair[0];
+    targetField->type = pair[1].toUpper() == "INT" ? FieldType::INT :
+                        pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
+                        pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
+    targetField->length = (targetField->type == FieldType::INT) ? 10 : 255;
+
+    if (m_storage->alterTable(m_currentUser, m_currentDb, m_currentTable, fields)) {
+        log("字段修改成功: " + fieldName + " -> " + pair[0]);
+        onRefreshSchema();
+    } else {
+        log("字段修改失败");
     }
 }
 

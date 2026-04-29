@@ -43,6 +43,11 @@ private slots:
     void onRefreshSchema();
     void onSearch();
 
+    // 字段操作
+    void onAddField();
+    void onDropField();
+    void onAlterField();
+
     // SQL解析
     void onExecuteSQL();
 
