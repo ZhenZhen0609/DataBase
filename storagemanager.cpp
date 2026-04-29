@@ -22,7 +22,11 @@ bool StorageManager::createDatabase(const QString &username, const QString &dbNa
         if (!dir.mkpath(userPath)) return false;
     }
     QString dbPath = userPath + "/" + dbName;
-    if (dir.exists(dbPath)) return true;
+    if (dir.exists(dbPath)) {
+        // 存在则返回 false 并说明原因
+        qDebug() << "[Storage] Error: Database already exists:" << dbName;
+        return false;
+    }
     if (dir.mkdir(dbPath)) {
         qDebug() << QString("[Storage] Folder \"%1\" created successfully.").arg(dbPath);
         return true;

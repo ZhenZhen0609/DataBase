@@ -37,6 +37,7 @@ public:
     QAction *actionCreateDb;
     QAction *actionCreateTable;
     QAction *actionDropTable;
+    QAction *actionAlterTable;
     QAction *actionExit;
     QAction *actionAbout;
     QWidget *centralwidget;
@@ -61,6 +62,7 @@ public:
     QHBoxLayout *tableButtonLayout;
     QPushButton *btnCreateTable;
     QPushButton *btnDropTable;
+    QPushButton *btnAlterTable;
     QVBoxLayout *rightLayout;
     QTabWidget *dataTableView;
     QWidget *tabData;
@@ -74,6 +76,11 @@ public:
     QVBoxLayout *schemaTabLayout;
     QPushButton *btnRefreshSchema;
     QTableWidget *tableSchema;
+    QWidget *tabSQL;
+    QVBoxLayout *sqlTabLayout;
+    QLabel *labelSQL;
+    QTextEdit *sqlInput;
+    QPushButton *btnExecuteSQL;
     QTextEdit *logOutput;
     QMenuBar *menubar;
     QMenu *menu;
@@ -91,6 +98,8 @@ public:
         actionCreateTable->setObjectName("actionCreateTable");
         actionDropTable = new QAction(MainWindow);
         actionDropTable->setObjectName("actionDropTable");
+        actionAlterTable = new QAction(MainWindow);
+        actionAlterTable->setObjectName("actionAlterTable");
         actionExit = new QAction(MainWindow);
         actionExit->setObjectName("actionExit");
         actionAbout = new QAction(MainWindow);
@@ -191,6 +200,11 @@ public:
 
         tableButtonLayout->addWidget(btnDropTable);
 
+        btnAlterTable = new QPushButton(centralwidget);
+        btnAlterTable->setObjectName("btnAlterTable");
+
+        tableButtonLayout->addWidget(btnAlterTable);
+
 
         leftLayout->addLayout(tableButtonLayout);
 
@@ -247,6 +261,26 @@ public:
         schemaTabLayout->addWidget(tableSchema);
 
         dataTableView->addTab(tabSchema, QString());
+        tabSQL = new QWidget();
+        tabSQL->setObjectName("tabSQL");
+        sqlTabLayout = new QVBoxLayout(tabSQL);
+        sqlTabLayout->setObjectName("sqlTabLayout");
+        labelSQL = new QLabel(tabSQL);
+        labelSQL->setObjectName("labelSQL");
+
+        sqlTabLayout->addWidget(labelSQL);
+
+        sqlInput = new QTextEdit(tabSQL);
+        sqlInput->setObjectName("sqlInput");
+
+        sqlTabLayout->addWidget(sqlInput);
+
+        btnExecuteSQL = new QPushButton(tabSQL);
+        btnExecuteSQL->setObjectName("btnExecuteSQL");
+
+        sqlTabLayout->addWidget(btnExecuteSQL);
+
+        dataTableView->addTab(tabSQL, QString());
 
         rightLayout->addWidget(dataTableView);
 
@@ -281,6 +315,7 @@ public:
         menu->addAction(actionCreateDb);
         menu->addAction(actionCreateTable);
         menu->addAction(actionDropTable);
+        menu->addAction(actionAlterTable);
         menu->addSeparator();
         menu->addAction(actionExit);
         menu_2->addAction(actionAbout);
@@ -299,6 +334,7 @@ public:
         actionCreateDb->setText(QCoreApplication::translate("MainWindow", "\345\210\233\345\273\272\346\225\260\346\215\256\345\272\223", nullptr));
         actionCreateTable->setText(QCoreApplication::translate("MainWindow", "\346\226\260\345\273\272\350\241\250", nullptr));
         actionDropTable->setText(QCoreApplication::translate("MainWindow", "\345\210\240\351\231\244\350\241\250", nullptr));
+        actionAlterTable->setText(QCoreApplication::translate("MainWindow", "\344\277\256\346\224\271\350\241\250", nullptr));
         actionExit->setText(QCoreApplication::translate("MainWindow", "\351\200\200\345\207\272", nullptr));
         actionAbout->setText(QCoreApplication::translate("MainWindow", "\345\205\263\344\272\216", nullptr));
         labelDb->setText(QCoreApplication::translate("MainWindow", "\346\225\260\346\215\256\345\272\223:", nullptr));
@@ -318,11 +354,16 @@ public:
         ___qtreewidgetitem->setText(0, QCoreApplication::translate("MainWindow", "\345\220\215\347\247\260", nullptr));
         btnCreateTable->setText(QCoreApplication::translate("MainWindow", "\346\226\260\345\273\272\350\241\250", nullptr));
         btnDropTable->setText(QCoreApplication::translate("MainWindow", "\345\210\240\351\231\244\350\241\250", nullptr));
+        btnAlterTable->setText(QCoreApplication::translate("MainWindow", "\344\277\256\346\224\271\350\241\250", nullptr));
         btnRefreshData->setText(QCoreApplication::translate("MainWindow", "\345\210\267\346\226\260\346\225\260\346\215\256", nullptr));
         btnInsertRecord->setText(QCoreApplication::translate("MainWindow", "\346\217\222\345\205\245\350\256\260\345\275\225", nullptr));
         dataTableView->setTabText(dataTableView->indexOf(tabData), QCoreApplication::translate("MainWindow", "\346\225\260\346\215\256\346\265\217\350\247\210", nullptr));
         btnRefreshSchema->setText(QCoreApplication::translate("MainWindow", "\345\210\267\346\226\260\347\273\223\346\236\204", nullptr));
         dataTableView->setTabText(dataTableView->indexOf(tabSchema), QCoreApplication::translate("MainWindow", "\350\241\250\347\273\223\346\236\204", nullptr));
+        labelSQL->setText(QCoreApplication::translate("MainWindow", "\350\276\223\345\205\245SQL\350\257\255\345\217\245 (\346\224\257\346\214\201: CREATE/DROP DATABASE/TABLE)", nullptr));
+        sqlInput->setPlaceholderText(QCoreApplication::translate("MainWindow", "\344\276\213\345\246\202: CREATE DATABASE mydb; \346\210\226 CREATE TABLE users (id INT, name TEXT);", nullptr));
+        btnExecuteSQL->setText(QCoreApplication::translate("MainWindow", "\346\211\247\350\241\214SQL", nullptr));
+        dataTableView->setTabText(dataTableView->indexOf(tabSQL), QCoreApplication::translate("MainWindow", "SQL\346\211\247\350\241\214", nullptr));
         logOutput->setPlaceholderText(QCoreApplication::translate("MainWindow", "\346\223\215\344\275\234\346\227\245\345\277\227...", nullptr));
         menu->setTitle(QCoreApplication::translate("MainWindow", "\346\225\260\346\215\256\345\272\223", nullptr));
         menu_2->setTitle(QCoreApplication::translate("MainWindow", "\345\270\256\345\212\251", nullptr));

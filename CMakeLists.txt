@@ -28,6 +28,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         authmanager.h authmanager.cpp
         schemamanager.h schemamanager.cpp
         recordmanager.h recordmanager.cpp
+        sqlparser.h sqlparser.cpp
 
 
 
