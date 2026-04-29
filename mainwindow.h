@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 #include <QTreeWidgetItem>
+#include <QMenu>
+#include <QAction>
 #include "authmanager.h"
 #include "schemamanager.h"
 #include "recordmanager.h"
@@ -39,12 +41,17 @@ private slots:
     void onRefreshData();
     void onInsertRecord();
     void onRefreshSchema();
+    void onSearch();
 
     // SQL解析
     void onExecuteSQL();
 
     // 树节点选中
     void onTreeItemClicked(QTreeWidgetItem *item, int column);
+    void onTreeItemContextMenu(const QPoint &pos);
+
+    // 右键菜单操作
+    void onContextMenuAction();
 
     // 菜单
     void onAbout();
@@ -62,6 +69,8 @@ private:
     QString m_currentDb;
     QString m_currentTable;
     bool    m_loggedIn = false;
+
+    QTreeWidgetItem *m_contextMenuTarget;
 
     void log(const QString &msg);
     void refreshTree();

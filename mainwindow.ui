@@ -172,30 +172,51 @@
            </attribute>
            <layout class="QVBoxLayout" name="dataTabLayout">
             <item>
-             <layout class="QHBoxLayout" name="recordToolLayout">
-              <item>
-               <widget class="QPushButton" name="btnRefreshData">
-                <property name="text">
-                 <string>刷新数据</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="btnInsertRecord">
-                <property name="text">
-                 <string>插入记录</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <spacer name="recordSpacer">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-               </spacer>
-              </item>
-             </layout>
-            </item>
+         <layout class="QHBoxLayout" name="recordToolLayout">
+          <item>
+           <widget class="QPushButton" name="btnRefreshData">
+            <property name="text">
+             <string>刷新数据</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnInsertRecord">
+            <property name="text">
+             <string>插入记录</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="recordSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelSearch">
+            <property name="text">
+             <string>搜索:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="inputSearch">
+            <property name="placeholderText">
+             <string>输入搜索关键词</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnSearch">
+            <property name="text">
+             <string>搜索</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
             <item>
              <widget class="QTableWidget" name="tableData">
               <property name="alternatingRowColors">

@@ -262,7 +262,7 @@ void runSchemaTests()
 // 记录管理器测试（阶段一 🔵蓝圈C + 阶段二 🔵蓝圈C）
 void runRecordTests()
 {
-    RecordManager recordManager;  // 注意：变量名是 recordManager
+    RecordManager recordManager;
     StorageManager storageManager;
     SchemaManager schemaManager;
 
@@ -270,29 +270,32 @@ void runRecordTests()
     qDebug() << "║  阶段一 🔵蓝圈C + 阶段二 🔵蓝圈C - 记录管理器测试                ║";
     qDebug() << "║  模块: RecordManager + StorageManager + SchemaManager           ║";
     qDebug() << "║  阶段一🔵蓝圈C任务: JSON格式数据插入查询（已完成）               ║";
-    qDebug() << "║  阶段二🔵蓝圈C任务: 结构化插入（校验.tdf）读取（.trd）(进行中)  ║";
+    qDebug() << "║  阶段二🔵蓝圈C任务: 结构化插入（校验.tdf）读取（.trd）(已完成)   ║";
     qDebug() << "╚════════════════════════════════════════════════════════════════╝";
-    qDebug() << "\n--- 阶段一 🔵蓝圈C: JSON格式数据操作 ---";
+    qDebug() << "\n--- 阶段二 🔵蓝圈C: .trd二进制格式 + .tdf字段校验 ---";
 
     // 先创建测试数据库和表
-    qDebug() << "\n[前置] 创建测试数据库 Student_System";
-    storageManager.createDatabase("testuser", "Student_System");
+    qDebug() << "\n[前置] 创建测试数据库 TestDB";
+    storageManager.createDatabase("testuser", "TestDB");
 
     // 创建表结构
     TableSchema studentSchema;
-    studentSchema.tableName = "test";
+    studentSchema.tableName = "students";
     studentSchema.fields.append(Field("id", FieldType::INT, 10));
     studentSchema.fields.append(Field("name", FieldType::TEXT, 50));
-    schemaManager.createTable("testuser", "Student_System", studentSchema);
+    studentSchema.fields.append(Field("age", FieldType::INT, 3));
+    studentSchema.fields.append(Field("score", FieldType::DOUBLE, 6));
+    schemaManager.createTable("testuser", "TestDB", studentSchema);
 
-    // 测试1: 插入第一条记录
-    qDebug() << "\n[测试1] 插入第一条记录 (张三, 20岁)";
+    // 测试1: 插入正确格式的记录
+    qDebug() << "\n[测试1] 插入正确格式的记录";
     QJsonObject record1;
     record1["id"] = 1;
     record1["name"] = "张三";
     record1["age"] = 20;
+    record1["score"] = 95.5;
 
-    Response insertResult1 = recordManager.insertRecord("testuser", "Student_System", "test", record1);
+    Response insertResult1 = recordManager.insertRecord("testuser", "TestDB", "students", record1);
     qDebug() << "插入结果: " << (insertResult1.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     qDebug() << "消息: " << insertResult1.message;
     if (insertResult1.status == ResponseStatus::OK) {
@@ -302,13 +305,14 @@ void runRecordTests()
     }
 
     // 测试2: 插入第二条记录
-    qDebug() << "\n[测试2] 插入第二条记录 (李四, 22岁)";
+    qDebug() << "\n[测试2] 插入第二条记录";
     QJsonObject record2;
     record2["id"] = 2;
     record2["name"] = "李四";
     record2["age"] = 22;
+    record2["score"] = 88.0;
 
-    Response insertResult2 = recordManager.insertRecord("testuser", "Student_System", "test", record2);
+    Response insertResult2 = recordManager.insertRecord("testuser", "TestDB", "students", record2);
     qDebug() << "插入结果: " << (insertResult2.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     qDebug() << "消息: " << insertResult2.message;
     if (insertResult2.status == ResponseStatus::OK) {
@@ -317,9 +321,26 @@ void runRecordTests()
         qDebug() << "测试2 失败!";
     }
 
-    // 测试3: 查询所有记录
-    qDebug() << "\n[测试3] 查询所有记录";
-    Response selectResult = recordManager.selectAllRecords("testuser", "Student_System", "test");
+    // 测试3: 阶段二🔵 - 字段类型校验（错误类型）
+    qDebug() << "\n[测试3] 字段类型校验 - age字段传入字符串（预期失败）";
+    QJsonObject badRecord;
+    badRecord["id"] = 3;
+    badRecord["name"] = "王五";
+    badRecord["age"] = "二十";  // 错误：age应为INT
+    badRecord["score"] = 90.0;
+
+    Response badInsert = recordManager.insertRecord("testuser", "TestDB", "students", badRecord);
+    qDebug() << "插入结果: " << (badInsert.status == ResponseStatus::ERROR ? "预期失败 ✓" : "意外成功 ✗");
+    qDebug() << "消息: " << badInsert.message;
+    if (badInsert.status == ResponseStatus::ERROR) {
+        qDebug() << "测试3 通过!";
+    } else {
+        qDebug() << "测试3 失败!";
+    }
+
+    // 测试4: 查询所有记录（从.trd读取）
+    qDebug() << "\n[测试4] 查询所有记录（从.trd文件读取）";
+    Response selectResult = recordManager.selectAllRecords("testuser", "TestDB", "students");
     qDebug() << "查询结果: " << (selectResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
     if (selectResult.status == ResponseStatus::OK) {
         QJsonArray records = selectResult.data.toJsonArray();
@@ -327,38 +348,51 @@ void runRecordTests()
         for (const QJsonValue &val : records) {
             QJsonObject obj = val.toObject();
             qDebug() << "  - id:" << obj["id"].toInt() << ", name:" << obj["name"].toString()
-                     << ", age:" << obj["age"].toInt();
+                     << ", age:" << obj["age"].toInt() << ", score:" << obj["score"].toDouble();
         }
-        qDebug() << "测试3 通过!";
-    } else {
-        qDebug() << "测试3 失败!";
-    }
-
-    // 测试4: 查询不存在的表
-    qDebug() << "\n[测试4] 查询不存在的表 (nonexistent)";
-    Response selectResult2 = recordManager.selectAllRecords("testuser", "Student_System", "nonexistent");
-    qDebug() << "查询结果: " << (selectResult2.status == ResponseStatus::TABLE_NOT_FOUND ? "预期失败 ✓" : "意外成功 ✗");
-    if (selectResult2.status == ResponseStatus::TABLE_NOT_FOUND) {
         qDebug() << "测试4 通过!";
     } else {
         qDebug() << "测试4 失败!";
     }
 
-    // 测试5: 验证数据文件存在（阶段一JSON格式）
-    QString filePath = "./data/Student_System/test.json";
-    qDebug() << "\n[测试5] 验证数据文件存在";
-    QFile file(filePath);
-    bool exists = file.exists();
-    qDebug() << "文件 " << filePath << (exists ? "存在 ✓" : "不存在 ✗");
-    if (exists) {
+    // 测试5: 查询不存在的表
+    qDebug() << "\n[测试5] 查询不存在的表";
+    Response selectResult2 = recordManager.selectAllRecords("testuser", "TestDB", "nonexistent");
+    qDebug() << "查询结果: " << (selectResult2.status == ResponseStatus::TABLE_NOT_FOUND ? "预期失败 ✓" : "意外成功 ✗");
+    if (selectResult2.status == ResponseStatus::TABLE_NOT_FOUND) {
         qDebug() << "测试5 通过!";
     } else {
         qDebug() << "测试5 失败!";
     }
 
+    // 测试6: 验证.trd文件存在
+    QString trdFilePath = "./data/testuser/TestDB/students.trd";
+    qDebug() << "\n[测试6] 验证.trd数据文件存在";
+    QFile trdFile(trdFilePath);
+    bool trdExists = trdFile.exists();
+    qDebug() << "文件 " << trdFilePath << (trdExists ? "存在 ✓" : "不存在 ✗");
+    if (trdExists) {
+        qDebug() << "文件大小: " << trdFile.size() << " bytes";
+        qDebug() << "测试6 通过!";
+    } else {
+        qDebug() << "测试6 失败!";
+    }
+
+    // 测试7: 验证.tdf文件存在
+    QString tdfFilePath = "./data/testuser/TestDB/students.tdf";
+    qDebug() << "\n[测试7] 验证.tdf表结构文件存在";
+    QFile tdfFile(tdfFilePath);
+    bool tdfExists = tdfFile.exists();
+    qDebug() << "文件 " << tdfFilePath << (tdfExists ? "存在 ✓" : "不存在 ✗");
+    if (tdfExists) {
+        qDebug() << "测试7 通过!";
+    } else {
+        qDebug() << "测试7 失败!";
+    }
+
     qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
     qDebug() << "║  阶段一 🔵蓝圈C + 阶段二 🔵蓝圈C - 记录管理器测试完成            ║";
-    qDebug() << "║  备注: 当前使用JSON格式(.json)，阶段二需改为.trd二进制格式        ║";
+    qDebug() << "║  备注: 已使用.trd二进制格式存储数据，支持.tdf字段类型校验          ║";
     qDebug() << "╚════════════════════════════════════════════════════════════════╝";
 }
 

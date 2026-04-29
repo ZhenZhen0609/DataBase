@@ -50,6 +50,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 树节点
     connect(ui->dbTree, &QTreeWidget::itemClicked, this, &MainWindow::onTreeItemClicked);
+    connect(ui->dbTree, &QTreeWidget::customContextMenuRequested, this, &MainWindow::onTreeItemContextMenu);
+
+    // 搜索
+    connect(ui->btnSearch, &QPushButton::clicked, this, &MainWindow::onSearch);
 
     // 菜单动作
     connect(ui->actionCreateDb,    &QAction::triggered, this, &MainWindow::onCreateDatabase);
@@ -508,5 +512,194 @@ void MainWindow::showSchemaTable(const QString &username, const QString &dbName,
         ui->tableSchema->setItem(i, 2, new QTableWidgetItem(QString::number(f.length)));
         ui->tableSchema->setItem(i, 3, new QTableWidgetItem(f.isNotNull ? "是" : "否"));
         ui->tableSchema->setItem(i, 4, new QTableWidgetItem(f.isPrimaryKey ? "是" : "否"));
+    }
+
+    ui->dataTableView->setCurrentIndex(1);
+}
+
+
+void MainWindow::onDropDatabase()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+
+    QString dbName = ui->inputDbName->text().trimmed();
+    if (dbName.isEmpty()) {
+        dbName = QInputDialog::getText(this, "删除数据库", "数据库名称:");
+        if (dbName.trimmed().isEmpty()) return;
+        dbName = dbName.trimmed();
+    }
+
+    int ret = QMessageBox::question(this, "确认删除",
+        QString("确定要删除数据库 \"%1\" 吗？此操作将删除所有表和数据，不可恢复！").arg(dbName));
+    if (ret != QMessageBox::Yes) return;
+
+    if (m_storage->dropDatabase(m_currentUser, dbName)) {
+        log(QString("[Storage] 数据库 \"%1\" 删除成功").arg(dbName));
+        if (m_currentDb == dbName) {
+            m_currentDb.clear();
+            m_currentTable.clear();
+            ui->tableData->clearContents();
+            ui->tableData->setRowCount(0);
+            ui->tableSchema->clearContents();
+            ui->tableSchema->setRowCount(0);
+        }
+        refreshTree();
+    } else {
+        log(QString("[Storage] 数据库 \"%1\" 删除失败").arg(dbName));
+    }
+}
+
+void MainWindow::onTreeItemContextMenu(const QPoint &pos)
+{
+    QTreeWidgetItem *item = ui->dbTree->itemAt(pos);
+    if (!item || !m_loggedIn) return;
+
+    m_contextMenuTarget = item;
+    QMenu menu(this);
+
+    if (item->parent() == nullptr) {
+        // 数据库节点
+        QString dbName = item->text(0);
+        m_currentDb = dbName;
+
+        QAction *newTableAction = menu.addAction("新建表");
+        connect(newTableAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
+        newTableAction->setData(QVariant::fromValue(QPair<QString, QString>("create_table", dbName)));
+
+        QAction *dropDbAction = menu.addAction("删除数据库");
+        connect(dropDbAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
+        dropDbAction->setData(QVariant::fromValue(QPair<QString, QString>("drop_database", dbName)));
+    } else {
+        // 表节点
+        QString dbName = item->parent()->text(0);
+        QString tableName = item->text(0);
+        m_currentDb = dbName;
+        m_currentTable = tableName;
+
+        QAction *dropTableAction = menu.addAction("删除表");
+        connect(dropTableAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
+        dropTableAction->setData(QVariant::fromValue(QPair<QString, QString>("drop_table", tableName)));
+    }
+
+    menu.exec(ui->dbTree->mapToGlobal(pos));
+}
+
+void MainWindow::onContextMenuAction()
+{
+    QAction *action = qobject_cast<QAction*>(sender());
+    if (!action) return;
+
+    QPair<QString, QString> data = action->data().value<QPair<QString, QString>>();
+    QString actionType = data.first;
+    QString name = data.second;
+
+    if (actionType == "create_table") {
+        onCreateTable();
+    } else if (actionType == "drop_database") {
+        int ret = QMessageBox::question(this, "确认删除",
+            QString("确定要删除数据库 \"%1\" 吗？此操作将删除所有表和数据，不可恢复！").arg(name));
+        if (ret == QMessageBox::Yes) {
+            if (m_storage->dropDatabase(m_currentUser, name)) {
+                log(QString("[Storage] 数据库 \"%1\" 删除成功").arg(name));
+                if (m_currentDb == name) {
+                    m_currentDb.clear();
+                    m_currentTable.clear();
+                    ui->tableData->clearContents();
+                    ui->tableData->setRowCount(0);
+                    ui->tableSchema->clearContents();
+                    ui->tableSchema->setRowCount(0);
+                }
+                refreshTree();
+            } else {
+                log(QString("[Storage] 数据库 \"%1\" 删除失败").arg(name));
+            }
+        }
+    } else if (actionType == "drop_table") {
+        int ret = QMessageBox::question(this, "确认删除",
+            QString("确定要删除表 \"%1\" 吗？此操作不可恢复！").arg(name));
+        if (ret == QMessageBox::Yes) {
+            Response r = m_schema->dropTable(m_currentUser, m_currentDb, name);
+            log(r.message);
+            if (r.status == ResponseStatus::OK) {
+                if (m_currentTable == name) {
+                    m_currentTable.clear();
+                    ui->tableData->clearContents();
+                    ui->tableData->setRowCount(0);
+                    ui->tableSchema->clearContents();
+                    ui->tableSchema->setRowCount(0);
+                }
+                refreshTree();
+            } else {
+                QMessageBox::warning(this, "删除失败", r.message);
+            }
+        }
+    }
+}
+
+void MainWindow::onSearch()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    QString searchText = ui->inputSearch->text().trimmed();
+    if (searchText.isEmpty()) {
+        showDataTable(m_currentUser, m_currentDb, m_currentTable);
+        return;
+    }
+
+    // 获取表结构，找到第一个文本字段进行搜索
+    Response sr = m_schema->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (sr.status != ResponseStatus::OK) {
+        log("[UI] 无法加载表结构: " + sr.message);
+        return;
+    }
+
+    TableSchema schema = sr.data.value<TableSchema>();
+    QString searchField = "name"; // 默认搜索字段
+    
+    // 优先选择第一个TEXT类型的字段
+    for (const Field &f : schema.fields) {
+        if (f.type == FieldType::TEXT) {
+            searchField = f.name;
+            break;
+        }
+    }
+
+    Response r = m_record->selectWhere(m_currentUser, m_currentDb, m_currentTable, searchField, searchText);
+    log(r.message);
+
+    ui->tableData->clearContents();
+    ui->tableData->setRowCount(0);
+
+    if (r.status != ResponseStatus::OK) return;
+
+    QJsonArray records = r.data.value<QJsonArray>();
+
+    QStringList cols;
+    for (const Field &f : schema.fields)
+        cols << f.name;
+    for (const QJsonValue &v : records) {
+        for (const QString &k : v.toObject().keys())
+            if (!cols.contains(k)) cols << k;
+    }
+    if (cols.isEmpty()) return;
+
+    ui->tableData->setColumnCount(cols.size());
+    ui->tableData->setHorizontalHeaderLabels(cols);
+    ui->tableData->setRowCount(records.size());
+
+    for (int row = 0; row < records.size(); ++row) {
+        QJsonObject obj = records[row].toObject();
+        for (int col = 0; col < cols.size(); ++col) {
+            QJsonValue val = obj.value(cols[col]);
+            QString text;
+            if (val.isBool())        text = val.toBool() ? "true" : "false";
+            else if (val.isDouble()) text = QString::number(val.toDouble());
+            else                     text = val.toString();
+            ui->tableData->setItem(row, col, new QTableWidgetItem(text));
+        }
     }
 }
