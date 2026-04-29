@@ -448,4 +448,5 @@ C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autog
   C:/Users/zhenz/Desktop/DBMS/common.h \
   C:/Users/zhenz/Desktop/DBMS/recordmanager.h \
   C:/Users/zhenz/Desktop/DBMS/schemamanager.h \
+  C:/Users/zhenz/Desktop/DBMS/sqlparser.h \
   C:/Users/zhenz/Desktop/DBMS/storagemanager.h

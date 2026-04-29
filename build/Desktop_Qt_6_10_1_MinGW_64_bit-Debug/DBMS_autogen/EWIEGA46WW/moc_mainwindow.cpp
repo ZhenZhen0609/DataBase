@@ -43,6 +43,7 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         "",
         "onRegister",
         "onCreateDatabase",
+        "onDropDatabase",
         "onCreateTable",
         "onDropTable",
         "onRefreshData",
@@ -62,22 +63,24 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         QtMocHelpers::SlotData<void()>(3, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'onCreateDatabase'
         QtMocHelpers::SlotData<void()>(4, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onCreateTable'
+        // Slot 'onDropDatabase'
         QtMocHelpers::SlotData<void()>(5, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onDropTable'
+        // Slot 'onCreateTable'
         QtMocHelpers::SlotData<void()>(6, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onRefreshData'
+        // Slot 'onDropTable'
         QtMocHelpers::SlotData<void()>(7, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onInsertRecord'
+        // Slot 'onRefreshData'
         QtMocHelpers::SlotData<void()>(8, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onRefreshSchema'
+        // Slot 'onInsertRecord'
         QtMocHelpers::SlotData<void()>(9, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onRefreshSchema'
+        QtMocHelpers::SlotData<void()>(10, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'onTreeItemClicked'
-        QtMocHelpers::SlotData<void(QTreeWidgetItem *, int)>(10, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 11, 12 }, { QMetaType::Int, 13 },
+        QtMocHelpers::SlotData<void(QTreeWidgetItem *, int)>(11, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 12, 13 }, { QMetaType::Int, 14 },
         }}),
         // Slot 'onAbout'
-        QtMocHelpers::SlotData<void()>(14, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(15, 2, QMC::AccessPrivate, QMetaType::Void),
     };
     QtMocHelpers::UintData qt_properties {
     };
@@ -104,13 +107,14 @@ void MainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 0: _t->onLogin(); break;
         case 1: _t->onRegister(); break;
         case 2: _t->onCreateDatabase(); break;
-        case 3: _t->onCreateTable(); break;
-        case 4: _t->onDropTable(); break;
-        case 5: _t->onRefreshData(); break;
-        case 6: _t->onInsertRecord(); break;
-        case 7: _t->onRefreshSchema(); break;
-        case 8: _t->onTreeItemClicked((*reinterpret_cast<std::add_pointer_t<QTreeWidgetItem*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
-        case 9: _t->onAbout(); break;
+        case 3: _t->onDropDatabase(); break;
+        case 4: _t->onCreateTable(); break;
+        case 5: _t->onDropTable(); break;
+        case 6: _t->onRefreshData(); break;
+        case 7: _t->onInsertRecord(); break;
+        case 8: _t->onRefreshSchema(); break;
+        case 9: _t->onTreeItemClicked((*reinterpret_cast<std::add_pointer_t<QTreeWidgetItem*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
+        case 10: _t->onAbout(); break;
         default: ;
         }
     }
@@ -135,14 +139,14 @@ int MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 10)
+        if (_id < 11)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 10;
+        _id -= 11;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 10)
+        if (_id < 11)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 10;
+        _id -= 11;
     }
     return _id;
 }

@@ -148,6 +148,34 @@
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QPushButton" name="btnAlterTable">
+            <property name="text">
+             <string>修改表</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnAddField">
+            <property name="text">
+             <string>添加字段</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnDropField">
+            <property name="text">
+             <string>删除字段</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnAlterField">
+            <property name="text">
+             <string>修改字段</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </item>
        </layout>
@@ -165,30 +193,51 @@
            </attribute>
            <layout class="QVBoxLayout" name="dataTabLayout">
             <item>
-             <layout class="QHBoxLayout" name="recordToolLayout">
-              <item>
-               <widget class="QPushButton" name="btnRefreshData">
-                <property name="text">
-                 <string>刷新数据</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="btnInsertRecord">
-                <property name="text">
-                 <string>插入记录</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <spacer name="recordSpacer">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-               </spacer>
-              </item>
-             </layout>
-            </item>
+         <layout class="QHBoxLayout" name="recordToolLayout">
+          <item>
+           <widget class="QPushButton" name="btnRefreshData">
+            <property name="text">
+             <string>刷新数据</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnInsertRecord">
+            <property name="text">
+             <string>插入记录</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="recordSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelSearch">
+            <property name="text">
+             <string>搜索:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="inputSearch">
+            <property name="placeholderText">
+             <string>输入搜索关键词</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnSearch">
+            <property name="text">
+             <string>搜索</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
             <item>
              <widget class="QTableWidget" name="tableData">
               <property name="alternatingRowColors">
@@ -214,6 +263,34 @@
              <widget class="QTableWidget" name="tableSchema">
               <property name="alternatingRowColors">
                <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="tabSQL">
+           <attribute name="title">
+            <string>SQL执行</string>
+           </attribute>
+           <layout class="QVBoxLayout" name="sqlTabLayout">
+            <item>
+             <widget class="QLabel" name="labelSQL">
+              <property name="text">
+               <string>输入SQL语句 (支持: CREATE/DROP DATABASE/TABLE)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTextEdit" name="sqlInput">
+              <property name="placeholderText">
+               <string>例如: CREATE DATABASE mydb; 或 CREATE TABLE users (id INT, name TEXT);</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnExecuteSQL">
+              <property name="text">
+               <string>执行SQL</string>
               </property>
              </widget>
             </item>
@@ -256,6 +333,11 @@
     <addaction name="actionCreateDb"/>
     <addaction name="actionCreateTable"/>
     <addaction name="actionDropTable"/>
+    <addaction name="actionAlterTable"/>
+    <addaction name="separator"/>
+    <addaction name="actionAddField"/>
+    <addaction name="actionDropField"/>
+    <addaction name="actionAlterField"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -282,6 +364,26 @@
   <action name="actionDropTable">
    <property name="text">
     <string>删除表</string>
+   </property>
+  </action>
+  <action name="actionAlterTable">
+   <property name="text">
+    <string>修改表</string>
+   </property>
+  </action>
+  <action name="actionAddField">
+   <property name="text">
+    <string>添加字段</string>
+   </property>
+  </action>
+  <action name="actionDropField">
+   <property name="text">
+    <string>删除字段</string>
+   </property>
+  </action>
+  <action name="actionAlterField">
+   <property name="text">
+    <string>修改字段</string>
    </property>
   </action>
   <action name="actionExit">

@@ -45,6 +45,7 @@ public:
     QLabel *labelDb;
     QLineEdit *inputDbName;
     QPushButton *btnCreateDb;
+    QPushButton *btnDropDb;
     QSpacerItem *horizontalSpacer;
     QLabel *labelUser;
     QLineEdit *inputUsername;
@@ -114,6 +115,11 @@ public:
         btnCreateDb->setObjectName("btnCreateDb");
 
         toolbarLayout->addWidget(btnCreateDb);
+
+        btnDropDb = new QPushButton(centralwidget);
+        btnDropDb->setObjectName("btnDropDb");
+
+        toolbarLayout->addWidget(btnDropDb);
 
         horizontalSpacer = new QSpacerItem(0, 0, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum);
 
@@ -298,6 +304,7 @@ public:
         labelDb->setText(QCoreApplication::translate("MainWindow", "\346\225\260\346\215\256\345\272\223:", nullptr));
         inputDbName->setPlaceholderText(QCoreApplication::translate("MainWindow", "\350\276\223\345\205\245\346\225\260\346\215\256\345\272\223\345\220\215", nullptr));
         btnCreateDb->setText(QCoreApplication::translate("MainWindow", "\345\210\233\345\273\272\346\225\260\346\215\256\345\272\223", nullptr));
+        btnDropDb->setText(QCoreApplication::translate("MainWindow", "\345\210\240\351\231\244\346\225\260\346\215\256\345\272\223", nullptr));
         labelUser->setText(QCoreApplication::translate("MainWindow", "\347\224\250\346\210\267\345\220\215:", nullptr));
         inputUsername->setPlaceholderText(QCoreApplication::translate("MainWindow", "\347\224\250\346\210\267\345\220\215", nullptr));
         labelPwd->setText(QCoreApplication::translate("MainWindow", "\345\257\206\347\240\201:", nullptr));

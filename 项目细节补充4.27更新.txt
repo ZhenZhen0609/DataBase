@@ -30,22 +30,25 @@
 当前文件结构
 DataBase-main/
 ├── main.cpp              # 程序入口（集成了GUI启动与测试模式）
-├── mainwindow.cpp/h      # 主窗口界面
+├── mainwindow.cpp/h      # 主窗口界面（粉圈D任务）
+├── mainwindow.ui         # UI设计文件（粉圈D任务）
 ├── storagemanager.cpp/h  # 存储管理器（红圈A任务）
-├── AuthManager.cpp/h     # 认证管理器（橙圈B任务）
-├── SchemaManager.cpp/h   # 模式管理器（橙圈B任务）
-├── RecordManager.cpp/h   # 记录管理器（蓝圈C任务）
+├── authmanager.cpp/h     # 认证管理器（橙圈B任务）
+├── schemamanager.cpp/h   # 模式管理器（橙圈B任务）
+├── recordmanager.cpp/h   # 记录管理器（蓝圈C任务）
 ├── common.h              # 公共类型定义
 ├── users.json            # 用户数据文件（运行自动生成）
 └── CMakeLists.txt        # 项目构建配置
 
 生成的数据文件结构（运行时创建）
 ./data/
-├── {dbName}/
-│   ├── {tableName}.tdf   # 表结构文件（JSON格式存储字段定义）
-│   ├── {tableName}.trd   # 数据记录文件（二进制格式）
-│   └── {dbName}.tb       # 表描述文件（二进制格式）
-└── {dbName}.json         # 旧格式数据文件（蓝圈C当前使用）
+├── {username}/           # 用户目录
+│   ├── {dbName}/         # 数据库目录
+│   │   ├── {tableName}.tdf   # 表结构文件（JSON格式存储字段定义）
+│   │   ├── {tableName}.trd   # 数据记录文件（二进制格式）
+│   │   ├── {dbName}.tb       # 表描述文件（二进制格式）
+│   │   └── ruanko.log        # 操作日志文件（阶段三新增）
+│   └── users.json            # 用户认证数据
 
 二、核心代码文件详解
 
@@ -58,14 +61,31 @@ DataBase-main/
 设计原理：
 - 利用条件变量控制入口，方便开发者在"调试阶段验证后端逻辑"与"集成阶段展示界面"之间灵活切换，无需修改多个文件。
 
-2.2 mainwindow.cpp/h - 主窗口
-功能：应用程序的主界面窗口，未来包含数据库操作UI控件。
-当前实现：
-- mainwindow.h：定义MainWindow类，继承自QMainWindow
-- mainwindow.cpp：实现窗口构造和析构函数
+2.2 mainwindow.cpp/h - 主窗口（粉圈D）
+功能：应用程序的主界面窗口，提供完整的数据库管理UI交互。
+核心功能（阶段一）：
+- 登录/注册界面
+- 数据库创建与删除
+- 左侧QTreeView显示数据库树状结构
+
+核心功能（阶段二）：
+- 建表对话框（动态添加字段）
+- 表结构展示（QTableView）
+- 数据浏览（QTableView）
+- UI联动刷新（建表后自动刷新树状图）
+
+核心功能（阶段三）：
+- 右键菜单（数据库：新建表/删除库；表：删除表）
+- 搜索工具条（支持文本字段模糊搜索）
+- 全局日志控制台（带时间戳）
+- 插入记录弹窗（根据表结构动态生成表单）
+
 设计原理：
 - 使用QMainWindow作为基类，提供菜单栏、工具栏等标准组件
-- 通过ui->setupUi(this)加载Qt Designer设计的界面
+- 通过QTreeWidget实现数据库/表的树状展示
+- 使用QTableWidget展示表结构和数据
+- 通过信号槽机制实现UI联动
+- 使用QMenu实现右键上下文菜单
 
 2.3 common.h - 公共类型定义
 功能：定义项目中全局使用的数据类型和常量。
@@ -83,25 +103,37 @@ DataBase-main/
 - 结构体封装相关数据，便于传递和管理
 
 2.4 storagemanager.cpp/h - 存储管理器（红圈A）
-功能：负责数据库文件夹和表物理文件的创建、管理和读取。
-核心方法：
-- createDatabase(dbName)：创建数据库文件夹（阶段一任务）
-- createTable(dbName, tableName)：创建空表文件（兼容旧接口）
-- createTable(dbName, tableName, fields)：创建表并写入字段结构到.tdf文件（阶段二任务）
-- loadTableSchema(dbName, tableName)：从.tdf文件读取表结构（阶段二任务）
+功能：负责数据库文件夹和表物理文件的创建、管理、修改和删除。
+核心方法（阶段一）：
+- createDatabase(username, dbName)：创建数据库文件夹
+- dropDatabase(username, dbName)：删除数据库文件夹及所有文件
+
+核心方法（阶段二）：
+- createTable(username, dbName, tableName)：创建空表文件（兼容旧接口）
+- createTable(username, dbName, tableName, fields)：创建表并写入字段结构到.tdf文件
+- loadTableSchema(username, dbName, tableName)：从.tdf文件读取表结构
+- dropTable(username, dbName, tableName)：删除表的.tdf和.trd文件
+
+核心方法（阶段三）：
+- alterTable(username, dbName, tableName, newFields)：修改表结构（添加/删除/修改字段）
+- writeLog(username, dbName, const QString &action)：写入操作日志到ruanko.log
+
 实现逻辑（createTable带字段参数版本）：
 1. 确认数据库文件夹存在
-2. 构建文件路径：{dbName}/{tableName}.tdf、{dbName}/{tableName}.trd、{dbName}/{dbName}.tb
+2. 构建文件路径：{username}/{dbName}/{tableName}.tdf、{username}/{dbName}/{tableName}.trd、{username}/{dbName}/{dbName}.tb
 3. 检查表是否已存在
 4. 创建.trd数据记录文件（空文件）
 5. 组装TableBlock头部信息（表名、记录数、字段数、文件路径、时间戳）
 6. 将TableBlock写入.tb文件（二进制格式）
 7. 将字段结构（名称、类型、长度、是否主键等）以JSON格式写入.tdf文件
-8. 输出成功日志：[Storage] Table xxx created in xxx with x fields.
+8. 写入操作日志到ruanko.log
+9. 输出成功日志：[Storage] Table xxx created in xxx with x fields.
+
 设计原理：
 - 使用Qt的QDir类进行文件系统操作
 - 使用QJsonDocument将表结构序列化为JSON格式存储
 - TableBlock使用二进制格式写入.tb文件，提高读取效率
+- 操作日志系统记录所有创建和删除动作，便于追踪和审计
 
 2.5 AuthManager.cpp/h - 认证管理器（橙圈B）
 功能：负责用户登录验证、新用户注册及密码安全管理。
@@ -121,38 +153,58 @@ DataBase-main/
 
 2.6 SchemaManager.cpp/h - 模式管理器（橙圈B）
 功能：负责数据库字段（模式）的类型校验和表结构持久化管理，与StorageManager协作完成物理文件操作。
-核心方法：
-- validateFieldType(type, value)：校验某个值是否符合指定的类型约束（支持INT、TEXT、DOUBLE、BOOLEAN）。
-- validateField(field, value)：校验某个值是否符合指定的字段定义（包含必填检查）。
-- validateRecord(schema, record)：校验整条记录的数据类型是否符合表结构。
-- createTable(dbName, schema)：调用StorageManager创建表物理文件并写入字段定义（阶段二任务）。
-- loadTableSchema(dbName, tableName)：调用StorageManager从.tdf文件加载表结构（阶段二任务）。
-- loadTables(dbName)：扫描数据库目录下所有.tdf文件，加载所有表结构（阶段二任务）。
-- dropTable(dbName, tableName)：删除表的.tdf和.trd物理文件（阶段二任务）。
+核心方法（阶段一）：
+- validateFieldType(type, value)：校验某个值是否符合指定的类型约束（支持INT、TEXT、DOUBLE、BOOLEAN）
+- validateField(field, value)：校验某个值是否符合指定的字段定义（包含必填检查）
+- validateRecord(schema, record)：校验整条记录的数据类型是否符合表结构
+
+核心方法（阶段二）：
+- createTable(username, dbName, schema)：调用StorageManager创建表物理文件并写入字段定义
+- loadTableSchema(username, dbName, tableName)：调用StorageManager从.tdf文件加载表结构
+- loadTables(username, dbName)：扫描数据库目录下所有.tdf文件，加载所有表结构
+- dropTable(username, dbName, tableName)：删除表的.tdf和.trd物理文件
+
+核心方法（阶段三）：
+- validateAndFillRecord(schema, existingRecords, record)：数据类型强校验、主键唯一性检查、默认值填充
+- alterTable(username, dbName, tableName, newFields)：修改表结构（添加/删除/修改字段）
+
 设计原理：
 - SchemaManager负责业务逻辑层面的表结构管理
 - StorageManager负责底层物理文件操作
 - 通过协作模式实现职责分离，提高代码可维护性
+- 数据校验采用多层校验机制：字段类型校验 → 主键唯一性校验 → 默认值填充
 
 2.7 RecordManager.cpp/h - 记录管理器（蓝圈C）
-功能：负责数据记录的插入和查询操作。
-核心方法：
-- insertRecord(dbName, tableName, data)：插入一条记录到指定表（阶段一：使用.json格式；阶段二待优化）。
-- selectAllRecords(dbName, tableName)：查询指定表的所有记录（阶段一：使用.json格式；阶段二待优化）。
-当前实现逻辑（阶段一）：
-1. 确保数据库目录存在（不存在则创建）
-2. 构建表数据文件路径：./data/{dbName}/{tableName}.json
-3. 读取现有数据（JSON数组格式）
-4. 添加新记录（自动添加创建时间戳_created_at）
-5. 写入文件并返回操作状态
-阶段二待实现：
-- 插入前读取.tdf文件进行字段类型校验
-- 将数据写入.trd文件（而非.json文件）
-- 使用二进制格式存储记录以提高性能
+功能：负责数据记录的增删改查操作，支持结构化数据校验和二进制存储。
+核心方法（阶段一）：
+- insertRecord(username, dbName, tableName, data)：插入记录（旧版.json格式）
+- selectAllRecords(username, dbName, tableName)：查询所有记录（旧版.json格式）
+
+核心方法（阶段二）：
+- insertRecord(username, dbName, tableName, data)：插入前读取.tdf校验字段类型，序列化写入.trd文件
+- selectAllRecords(username, dbName, tableName)：从.trd文件反序列化读取所有记录
+- loadTableSchema(username, dbName, tableName)：从.tdf文件加载字段定义
+- validateRecord(fields, data)：校验记录数据类型是否符合字段定义
+- serializeRecord(record, fields)：将记录序列化为二进制格式
+- deserializeRecord(data, fields)：从二进制数据反序列化记录
+
+核心方法（阶段三）：
+- updateRecord(username, dbName, tableName, recordId, newData)：根据主键更新记录
+- deleteRecord(username, dbName, tableName, recordId)：根据主键删除记录
+- selectWhere(username, dbName, tableName, fieldName, value)：条件查询（支持模糊匹配）
+
+实现逻辑（阶段三完整版本）：
+1. 插入：读取.tdf校验字段类型 → 校验主键唯一性 → 序列化 → 写入.trd
+2. 查询：读取.trd文件 → 反序列化 → 返回QJsonArray
+3. 更新：遍历.trd找到匹配记录 → 替换数据 → 重写文件
+4. 删除：遍历.trd过滤掉匹配记录 → 重写文件
+5. 条件查询：遍历.trd → 字段匹配 → 返回匹配记录
+
 设计原理：
-- 使用QJsonDocument处理JSON数据的读写。
-- 每条记录自动添加_created_at字段记录创建时间。
-- 返回统一的Response结构体，包含状态、消息和数据。
+- 使用QDataStream进行二进制序列化，提高存储和读取效率
+- 每条记录自动添加_created_at字段记录创建时间
+- 支持INT、TEXT、DOUBLE、BOOLEAN四种数据类型的强校验
+- 返回统一的Response结构体，包含状态、消息和数据
 
 2.8 users.json - 用户数据文件
 功能：存储用户账号和加密后的密码哈希值。
@@ -173,14 +225,26 @@ DataBase-main/
 - 添加源文件到项目（包括新增的 SchemaManager 和 RecordManager 文件）
 - 链接Qt库（Widgets、Core）
 
-三、数据流向图
-用户操作 → MainWindow → AuthManager → users.json (验证)
-                          ↓
-                   数据库操作 → SchemaManager (字段校验/表结构)
-                                    ↓
-                          StorageManager (创建.tdf/.trd/.tb文件)
-                                    ↓
-                          RecordManager → {tableName}.json (数据持久化)
+三、数据流向图（阶段三完整版本）
+
+登录流程：
+用户操作 → MainWindow → AuthManager → users.json (验证) → 返回登录状态
+
+数据库操作流程：
+用户操作 → MainWindow → SchemaManager (字段校验/表结构管理)
+                              ↓
+                    StorageManager (创建/删除/修改 .tdf/.trd/.tb 文件)
+                              ↓
+                    ruanko.log (记录操作日志)
+
+数据操作流程：
+用户操作 → MainWindow → RecordManager (增删改查)
+                              ↓
+                    SchemaManager (数据类型校验/主键唯一性检查)
+                              ↓
+                    StorageManager (读取.tdf / 读写.trd)
+                              ↓
+                    {tableName}.trd (二进制数据持久化)
 
 四、模块协作关系
 ┌─────────────────────────────────────────────────────────────┐
@@ -224,10 +288,18 @@ DataBase-main/
 |--------|------|----------|------|--------|
 | 🔴 红圈A | StorageManager | 创建表文件(.tdf/.trd/.tb)并写入表结构 | ✅已完成 | 100% |
 | 🟠 橙圈B | SchemaManager | 字段规则管理，与StorageManager协作 | ✅已完成 | 100% |
-| 🔵 蓝圈C | RecordManager | 结构化插入（校验.tdf）和读取（从.trd） | ⚠️进行中
-| 💗 粉圈D | MainWindow | 建表对话框与数据实时刷新UI | ❌未开始 | 0% |
+| 🔵 蓝圈C | RecordManager | 结构化插入（校验.tdf）和读取（从.trd） | ✅已完成 | 100% |
+| 💗 粉圈D | MainWindow | 建表对话框与数据实时刷新UI | ✅已完成 | 100% |
 
-5.3 各阶段任务详细说明
+5.3 阶段三任务完成情况
+| 圈标识 | 模块 | 任务描述 | 状态 | 完成度 |
+|--------|------|----------|------|--------|
+| 🔴 红圈A | StorageManager | 生命周期管理（Drop/Alter/日志） | ✅已完成 | 100% |
+| 🟠 橙圈B | SchemaManager | 数据审查制度（校验/主键/默认值） | ✅已完成 | 100% |
+| 🔵 蓝圈C | RecordManager | 增删改查（Update/Delete/Select Where） | ✅已完成 | 100% |
+| 💗 粉圈D | MainWindow | UI高级交互（右键菜单/搜索/日志控制台） | ✅已完成 | 100% |
+
+5.4 各阶段任务详细说明
 
 【阶段一 - 基础功能】
 - 🔴 红圈A：`createDatabase()` 方法已实现，可在./data/目录下创建数据库文件夹
@@ -237,8 +309,14 @@ DataBase-main/
 【阶段二 - 进阶功能】
 - 🔴 红圈A：`createTable(dbName, tableName, fields)` 已实现，创建.tdf/.trd/.tb三个物理文件，并将字段结构写入.tdf
 - 🟠 橙圈B：SchemaManager已与StorageManager协作，表结构的创建、加载、删除均通过.tdf文件操作
-- 🔵 蓝圈C：当前仍使用.json格式存储数据，需修改为：①插入前读取.tdf校验字段类型 ②将数据写入.trd文件
-- 💗 粉圈D：UI界面尚未实现建表弹窗和数据展示功能
+- 🔵 蓝圈C：`insertRecord()` 和 `selectAllRecords()` 已修改为：①插入前读取.tdf校验字段类型 ②将数据写入.trd二进制文件 ③从.trd文件读取数据
+- 💗 粉圈D：MainWindow已实现完整UI功能：建表对话框（动态添加字段）、左侧QTreeView树状图、右侧QTableView数据展示、UI联动刷新
+
+【阶段三 - 高级功能】
+- 🔴 红圈A：`dropTable()`、`dropDatabase()`、`alterTable()` 已实现；`ruanko.log`日志系统已集成，记录所有创建和删除动作
+- 🟠 橙圈B：`validateAndFillRecord()` 已实现：数据类型强校验、主键唯一性检查、默认值填充
+- 🔵 蓝圈C：`updateRecord()`、`deleteRecord()`、`selectWhere()` 已实现完整的增删改查功能
+- 💗 粉圈D：右键菜单（删除库/新建表/删除表）、搜索工具条、全局日志控制台已实现
 
 六、测试验证说明
 测试开关 RUN_TESTS_ONLY 已设置为 true，运行程序将自动执行以下测试：
@@ -260,16 +338,36 @@ DataBase-main/
    - 删除表（删除.tdf和.trd文件）
    - 删除不存在表检测
 
-3. 蓝圈C - 记录管理器测试：
-   - 插入记录（张三，20岁）
-   - 插入记录（李四，22岁）
-   - 查询所有记录
+3. 蓝圈C - 记录管理器测试（阶段二）：
+   - 插入正确格式的记录（含INT、TEXT、DOUBLE类型）
+   - 字段类型校验（错误类型数据插入失败）
+   - 查询所有记录（从.trd文件读取）
    - 查询不存在表检测
-   - 验证数据文件存在
+   - 验证.trd数据文件存在
+   - 验证.tdf表结构文件存在
+
+4. 蓝圈C - 记录管理器测试（阶段三）：
+   - 更新记录（updateRecord）
+   - 删除记录（deleteRecord）
+   - 条件查询（selectWhere）
+   - 主键唯一性校验
+   - 默认值填充测试
+
+5. 红圈A - 存储管理器测试（阶段三）：
+   - dropTable 删除表
+   - dropDatabase 删除数据库
+   - alterTable 修改表结构
+   - ruanko.log日志生成验证
+
+6. 粉圈D - UI测试（阶段三）：
+   - 右键菜单功能
+   - 搜索工具条功能
+   - 全局日志控制台输出
    
 测试通过标准：
 - 控制台输出显示所有测试"通过!"
-- 物理文件验证：./data/TestDB/students.tdf 存在且包含字段定义
-- 物理文件验证：./data/Student_System/test.json 存在且包含插入的数据
+- 物理文件验证：./data/testuser/TestDB/students.tdf 存在且包含字段定义
+- 物理文件验证：./data/testuser/TestDB/students.trd 存在且包含二进制数据
+- 物理文件验证：./data/testuser/TestDB/ruanko.log 存在且包含操作日志
 
-最新更新至————4.18
+最新更新至————4.27
