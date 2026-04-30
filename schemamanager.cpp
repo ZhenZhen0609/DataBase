@@ -37,6 +37,7 @@ bool SchemaManager::validateFieldType(const QString &type, const QVariant &value
     }
 }
 
+//检查字段值是否符合定义
 bool SchemaManager::validateField(const Field &field, const QVariant &value) const
 {
     if (field.isPrimaryKey && (value.isNull() || value.toString().isEmpty())) {
@@ -141,6 +142,7 @@ Response SchemaManager::loadTableSchema(const QString &username, const QString &
     return {ResponseStatus::OK, QString("[Schema] Loaded table '%1' with %2 fields").arg(tableName).arg(fields.size()), QVariant::fromValue(schema)};
 }
 
+//加载数据库中的所有表
 Response SchemaManager::loadTables(const QString &username, const QString &dbName)
 {
     QString dbPath = Config::DATA_PATH + username + "/" + dbName;
@@ -194,6 +196,7 @@ Response SchemaManager::dropTable(const QString &username, const QString &dbName
     return {ResponseStatus::OK, QString("[Schema] Table '%1' dropped successfully").arg(tableName), QVariant()};
 }
 
+//完整性检查，验证并填充记录
 Response SchemaManager::validateAndFillRecord(const TableSchema &schema,
                                               const QJsonArray &existingRecords,
                                               QJsonObject &record) const

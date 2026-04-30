@@ -7,7 +7,7 @@
 #include <QMap>
 #include <QDateTime>
 
-// 1. 定义支持的数据类型
+//定义支持的数据类型
 enum class FieldType {
     INT,
     TEXT,
@@ -15,7 +15,7 @@ enum class FieldType {
     BOOLEAN
 };
 
-// 2. 字段定义（由橙圈B和蓝圈C重点使用）
+//字段定义
 struct Field {
     QString name;       // 字段名
     FieldType type;    // 类型
@@ -28,13 +28,13 @@ struct Field {
         : name(n), type(t), length(l), isNotNull(false), isPrimaryKey(false) {}
 };
 
-// 3. 表结构定义（由红圈A和橙圈B重点使用）
+//表结构定义
 struct TableSchema {
     QString tableName;
     QList<Field> fields;
 };
 
-// 4. 操作返回状态（全员使用，用于界面提示）
+//操作返回状态用于界面提示
 enum class ResponseStatus {
     OK,
     ERROR,
@@ -50,7 +50,7 @@ struct Response {
     QVariant data;     // 返回的数据（比如查询结果集）
 };
 
-// 5. 全局常量（由红圈A定义，全员遵守）
+//全局常量
 namespace Config {
 const QString DATA_PATH = "./data/";        // 数据存储根目录
 const QString USER_FILE = "users.json";     // 用户配置文件名

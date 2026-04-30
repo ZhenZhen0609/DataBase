@@ -33,6 +33,7 @@ private:
     Response execCreateTable(const QString &tableName, const QString &fieldsStr);
     Response execDropDatabase(const QString &dbName);
     Response execDropTable(const QString &tableName);
+    Response execAlterTable(const QString &tableName, const QString &alterType, const QString &fieldStr);
 
     QList<Field> parseFieldDefinitions(const QString &fieldsStr) const;
     FieldType strToFieldType(const QString &typeStr) const;

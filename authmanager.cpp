@@ -13,12 +13,14 @@ AuthManager::AuthManager(QObject *parent)
 {
 }
 
+//密码哈希化
 QString AuthManager::hashPassword(const QString &password) const
 {
     QByteArray hash = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256);
     return QString(hash.toHex());
 }
 
+//辅助函数，加载用户数据
 QJsonObject AuthManager::loadUsers() const
 {
     QString filePath = findUserFile();
@@ -45,11 +47,12 @@ QJsonObject AuthManager::loadUsers() const
     return doc.object();
 }
 
+//辅助函数，查找用户文件路径
 QString AuthManager::findUserFile() const
 {
     const QString fileName = QStringLiteral("users.json");
 
-    // 多路径搜索列表（按优先级）
+    // 多路径搜索列表
     QStringList searchPaths;
     searchPaths << QDir::currentPath()                     // 当前工作目录
                 << QCoreApplication::applicationDirPath()  // 可执行文件所在目录
@@ -90,6 +93,7 @@ void AuthManager::createDefaultUserFile(const QString &filePath) const
     qDebug() << "[Auth] Created default user file at:" << filePath;
 }
 
+//登录
 bool AuthManager::login(const QString &username, const QString &password)
 {
     QJsonObject users = loadUsers();
@@ -116,6 +120,7 @@ bool AuthManager::login(const QString &username, const QString &password)
     }
 }
 
+//注册
 bool AuthManager::registerUser(const QString &username, const QString &password)
 {
     // 加载现有用户数据
