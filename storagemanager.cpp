@@ -10,6 +10,7 @@
 
 StorageManager::StorageManager() {}
 
+//建库
 bool StorageManager::createDatabase(const QString &username, const QString &dbName)
 {
     QString rootPath = Config::DATA_PATH;
@@ -34,6 +35,7 @@ bool StorageManager::createDatabase(const QString &username, const QString &dbNa
     return false;
 }
 
+//快速建表
 bool StorageManager::createTable(const QString &username, QString dbName, QString tableName)
 {
     QString dbPath = Config::DATA_PATH + username + "/" + dbName;
@@ -85,6 +87,7 @@ bool StorageManager::createTable(const QString &username, QString dbName, QStrin
     }
 }
 
+//元数据写入
 bool StorageManager::writeTableDefinition(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data)
 {
     QString dbPath = Config::DATA_PATH + username + "/" + dbName;
@@ -107,6 +110,7 @@ bool StorageManager::writeTableDefinition(const QString &username, const QString
     return true;
 }
 
+//建表
 bool StorageManager::createTable(const QString &username, QString dbName, QString tableName, const QList<Field> &fields)
 {
     QString dbPath = Config::DATA_PATH + username + "/" + dbName;
@@ -182,6 +186,7 @@ bool StorageManager::createTable(const QString &username, QString dbName, QStrin
     return true;
 }
 
+//元数据读取
 QList<Field> StorageManager::loadTableSchema(const QString &username, QString dbName, QString tableName)
 {
     QString tdfPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".tdf";
@@ -225,6 +230,7 @@ QList<Field> StorageManager::loadTableSchema(const QString &username, QString db
     return fields;
 }
 
+//删除表物理文件
 bool StorageManager::dropTable(const QString &username, const QString &dbName, const QString &tableName)
 {
     QString dbPath = Config::DATA_PATH + username + "/" + dbName;
@@ -266,6 +272,7 @@ bool StorageManager::dropTable(const QString &username, const QString &dbName, c
     return success;
 }
 
+//删除整个数据库文件夹
 bool StorageManager::dropDatabase(const QString &username, const QString &dbName)
 {
     QString dbPath = Config::DATA_PATH + username + "/" + dbName;
@@ -286,6 +293,7 @@ bool StorageManager::dropDatabase(const QString &username, const QString &dbName
     }
 }
 
+//改表结构
 bool StorageManager::alterTable(const QString &username, const QString &dbName, const QString &tableName, const QList<Field> &newFields)
 {
     QString dbPath = Config::DATA_PATH + username + "/" + dbName;
@@ -361,6 +369,7 @@ bool StorageManager::alterTable(const QString &username, const QString &dbName, 
     return true;
 }
 
+//写日志
 void StorageManager::writeLog(const QString &username, const QString &dbName, const QString &logMessage)
 {
     // 定位到该数据库下的 ruanko.log

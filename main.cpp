@@ -25,32 +25,12 @@ int main(int argc, char *argv[])
     // 如果只需要运行测试（调试各模块）
     if (RUN_TESTS_ONLY) {
         QCoreApplication a(argc, argv);
-
-        qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
-        qDebug() << "║                    DBMS 测试套件 - 阶段任务一览                  ║";
-        qDebug() << "╠════════════════════════════════════════════════════════════════╣";
-        qDebug() << "║  阶段一（基础功能）:                                            ║";
-        qDebug() << "║    🔴红圈A: StorageManager - 创建数据库文件夹                    ║";
-        qDebug() << "║    🟠橙圈B: AuthManager - 用户登录验证                          ║";
-        qDebug() << "║    🔵蓝圈C: RecordManager - JSON格式数据插入查询                 ║";
-        qDebug() << "╠════════════════════════════════════════════════════════════════╣";
-        qDebug() << "║  阶段二（进阶功能）:                                            ║";
-        qDebug() << "║    🔴红圈A: StorageManager - 创建.tdf/.trd/.tb表文件             ║";
-        qDebug() << "║    🟠橙圈B: SchemaManager - 字段规则管理与表结构持久化           ║";
-        qDebug() << "║    🔵蓝圈C: RecordManager - 结构化插入（校验.tdf）读取（.trd）    ║";
-        qDebug() << "║    💗粉圈D: MainWindow - UI建表对话框与数据实时刷新              ║";
-        qDebug() << "╚════════════════════════════════════════════════════════════════╝\n";
-
         // 运行各模块测试
         runAuthTests();
         runSchemaTests();
         runRecordTests();
         runStorageTests();
         runSQLParserTests();
-
-        qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
-        qDebug() << "║                      所有测试执行完成                            ║";
-        qDebug() << "╚════════════════════════════════════════════════════════════════╝\n";
 
         return 0; // 测试完成直接退出
     }

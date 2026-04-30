@@ -114,6 +114,7 @@ Response RecordManager::validateRecord(const QList<Field> &fields, const QJsonOb
     return {ResponseStatus::OK, "[Record] 数据校验通过", QVariant()};
 }
 
+//序列化数据
 QByteArray RecordManager::serializeRecord(const QJsonObject &record, const QList<Field> &fields)
 {
     QByteArray data;
@@ -269,6 +270,7 @@ Response RecordManager::selectAllRecords(const QString &username, const QString 
     return {ResponseStatus::OK, QString("[Record] Retrieved %1 records").arg(records.size()), QVariant::fromValue(records)};
 }
 
+//获取表的主键字段名
 QString RecordManager::getPrimaryKeyField(const QList<Field> &fields) const
 {
     for (const Field &f : fields) {

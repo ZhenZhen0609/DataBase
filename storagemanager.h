@@ -7,7 +7,7 @@
 #include <QDateTime>
 #include "common.h"
 
-    // 按照需求文档 3.12.5 定义表格信息块的物理存储结构
+    //定义表格信息块的物理存储结构
     struct TableBlock {
     char name[128];       // 表格名称
     int record_num;       // 记录数
@@ -32,7 +32,9 @@ public:
     StorageManager();
 
     bool createDatabase(const QString &username, const QString &dbName);
+    //快速建表
     bool createTable(const QString &username, QString dbName, QString tableName);
+    //建表
     bool createTable(const QString &username, QString dbName, QString tableName, const QList<Field> &fields);
     bool writeTableDefinition(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data);
     QList<Field> loadTableSchema(const QString &username, QString dbName, QString tableName);
