@@ -1,0 +1,34 @@
+{
+    "fieldCount": 4,
+    "fields": [
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 10,
+            "name": "id",
+            "type": 0
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 255,
+            "name": "name",
+            "type": 1
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 255,
+            "name": "birth",
+            "type": 1
+        },
+        {
+            "isNotNull": false,
+            "isPrimaryKey": false,
+            "length": 10,
+            "name": "course",
+            "type": 0
+        }
+    ],
+    "tableName": "111"
+}

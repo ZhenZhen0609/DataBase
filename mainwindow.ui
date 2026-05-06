@@ -6,302 +6,725 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>960</width>
-    <height>720</height>
+    <width>1200</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>DBMS 数据库管理系统</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">QMainWindow {
+    background-color: #1e1e2e;
+}
+
+QLabel {
+    color: #cdd6f4;
+    font-size: 14px;
+}
+
+QLineEdit, QTextEdit {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    padding: 8px;
+    color: #cdd6f4;
+    font-family: Consolas, monospace;
+}
+
+QLineEdit:focus, QTextEdit:focus {
+    border: 1px solid #89b4fa;
+}
+
+QPushButton {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: #cdd6f4;
+    min-width: 80px;
+}
+
+QPushButton:hover {
+    background-color: #45475a;
+}
+
+QPushButton:pressed {
+    background-color: #585b70;
+}
+
+QPushButton#btnLogin {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+    font-weight: bold;
+}
+
+QPushButton#btnLogin:hover {
+    background-color: #b4befe;
+}
+
+QPushButton#btnCreateDb, QPushButton#btnCreateTable, QPushButton#btnAddField, QPushButton#btnInsertRecord {
+    background-color: #a6e3a1;
+    color: #1e1e2e;
+}
+
+QPushButton#btnCreateDb:hover, QPushButton#btnCreateTable:hover, QPushButton#btnAddField:hover, QPushButton#btnInsertRecord:hover {
+    background-color: #baf0b8;
+}
+
+QPushButton#btnDropDb, QPushButton#btnDropTable, QPushButton#btnDropField {
+    background-color: #f38ba8;
+    color: #1e1e2e;
+}
+
+QPushButton#btnDropDb:hover, QPushButton#btnDropTable:hover, QPushButton#btnDropField:hover {
+    background-color: #eba0ac;
+}
+
+QPushButton#btnExecuteSQL {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+    font-weight: bold;
+}
+
+QPushButton#btnExecuteSQL:hover {
+    background-color: #b4befe;
+}
+
+QTreeWidget {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    padding: 8px;
+    color: #cdd6f4;
+    show-decoration-selected: 1;
+}
+
+QTreeWidget::item {
+    padding: 6px;
+}
+
+QTreeWidget::item:hover {
+    background-color: #45475a;
+}
+
+QTreeWidget::item:selected {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+}
+
+QTableWidget {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    color: #cdd6f4;
+    gridline-color: #45475a;
+}
+
+QTableWidget::item {
+    padding: 6px;
+}
+
+QTableWidget::item:selected {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+}
+
+QHeaderView::section {
+    background-color: #45475a;
+    color: #cdd6f4;
+    padding: 8px;
+    border: none;
+    font-weight: bold;
+}
+
+QTabWidget::pane {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+}
+
+QTabBar::tab {
+    background-color: #313244;
+    color: #cdd6f4;
+    padding: 10px 20px;
+    border: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:hover {
+    background-color: #45475a;
+}
+
+QTabBar::tab:selected {
+    background-color: #313244;
+    color: #89b4fa;
+}
+
+QTabBar::tab:!selected {
+    margin-bottom: 0px;
+}
+
+QMenuBar {
+    background-color: #181825;
+    color: #cdd6f4;
+}
+
+QMenuBar::item {
+    background-color: #181825;
+    padding: 6px 12px;
+}
+
+QMenuBar::item:selected {
+    background-color: #45475a;
+}
+
+QMenu {
+    background-color: #313244;
+    color: #cdd6f4;
+}
+
+QMenu::item {
+    padding: 8px 16px;
+}
+
+QMenu::item:selected {
+    background-color: #45475a;
+}
+
+QStatusBar {
+    background-color: #181825;
+    color: #a6adc8;
+}
+
+QTextEdit#logOutput {
+    background-color: #11111b;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    color: #a6e3a1;
+    font-family: Consolas, monospace;
+}
+
+QScrollBar:vertical {
+    background: #313244;
+    width: 10px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical {
+    background: #45475a;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #585b70;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}</string>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
+    <!-- 顶部工具栏 -->
     <item>
-     <layout class="QHBoxLayout" name="toolbarLayout">
-      <item>
-       <widget class="QLabel" name="labelDb">
-        <property name="text">
-         <string>数据库:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="inputDbName">
-        <property name="placeholderText">
-         <string>输入数据库名</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="btnCreateDb">
-        <property name="text">
-         <string>创建数据库</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="btnDropDb">
-        <property name="text">
-         <string>删除数据库</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-       </spacer>
-      </item>
-      <item>
-       <widget class="QLabel" name="labelUser">
-        <property name="text">
-         <string>用户名:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="inputUsername">
-        <property name="placeholderText">
-         <string>用户名</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="labelPwd">
-        <property name="text">
-         <string>密码:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="inputPassword">
-        <property name="echoMode">
-         <enum>QLineEdit::Password</enum>
-        </property>
-        <property name="placeholderText">
-         <string>密码</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="btnLogin">
-        <property name="text">
-         <string>登录</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="btnRegister">
-        <property name="text">
-         <string>注册</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="labelWelcome">
-        <property name="text">
-         <string>未登录</string>
-        </property>
-        <property name="styleSheet">
-         <string>color: gray;</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
+     <widget class="QWidget" name="topToolbar" native="true">
+      <property name="minimumHeight">
+       <number>60</number>
+      </property>
+      <layout class="QHBoxLayout" name="topToolbarLayout">
+       <property name="leftMargin">
+        <number>16</number>
+       </property>
+       <property name="topMargin">
+        <number>8</number>
+       </property>
+       <property name="rightMargin">
+        <number>16</number>
+       </property>
+       <property name="bottomMargin">
+        <number>8</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="appIcon">
+         <property name="text">
+          <string>📦</string>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>20</pointsize>
+          </font>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="appTitle">
+         <property name="text">
+          <string>DBMS 数据库管理系统</string>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>16</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelDb">
+         <property name="text">
+          <string>📦</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="inputDbName">
+         <property name="placeholderText">
+          <string>数据库名</string>
+         </property>
+         <property name="minimumWidth">
+          <number>120</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnCreateDb">
+         <property name="text">
+          <string>创建</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnDropDb">
+         <property name="text">
+          <string>删除</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelUser">
+         <property name="text">
+          <string>👤</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="inputUsername">
+         <property name="placeholderText">
+          <string>用户名</string>
+         </property>
+         <property name="minimumWidth">
+          <number>100</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelPwd">
+         <property name="text">
+          <string>🔑</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="inputPassword">
+         <property name="echoMode">
+          <enum>QLineEdit::Password</enum>
+         </property>
+         <property name="placeholderText">
+          <string>密码</string>
+         </property>
+         <property name="minimumWidth">
+          <number>100</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnLogin">
+         <property name="text">
+          <string>登录</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnRegister">
+         <property name="text">
+          <string>注册</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="topToolbarSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelWelcome">
+         <property name="text">
+          <string>未登录</string>
+         </property>
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">color: #a6e3a1;</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </item>
+    <!-- 主内容区 -->
     <item>
      <layout class="QHBoxLayout" name="mainLayout">
+      <!-- 左侧数据库树 -->
       <item>
-       <layout class="QVBoxLayout" name="leftLayout">
-        <item>
-         <widget class="QLabel" name="labelTree">
-          <property name="text">
-           <string>数据库/表 列表</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QTreeWidget" name="dbTree">
-          <property name="minimumWidth">
-           <number>200</number>
-          </property>
-          <column>
+       <widget class="QWidget" name="sidebar" native="true">
+        <property name="minimumWidth">
+         <number>220</number>
+        </property>
+        <property name="maximumWidth">
+         <number>280</number>
+        </property>
+        <layout class="QVBoxLayout" name="sidebarLayout">
+         <property name="spacing">
+          <number>12</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="sidebarTitle">
            <property name="text">
-            <string>名称</string>
+            <string>数据库/表</string>
            </property>
-          </column>
-         </widget>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="tableButtonLayout">
-          <item>
-           <widget class="QPushButton" name="btnCreateTable">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QTreeWidget" name="dbTree">
+           <property name="minimumWidth">
+            <number>200</number>
+           </property>
+           <property name="indentation">
+            <number>15</number>
+           </property>
+           <property name="rootIsDecorated">
+            <bool>true</bool>
+           </property>
+           <property name="itemsExpandable">
+            <bool>true</bool>
+           </property>
+           <property name="sortingEnabled">
+            <bool>false</bool>
+           </property>
+           <column>
             <property name="text">
-             <string>新建表</string>
+             <string>名称</string>
             </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnDropTable">
-            <property name="text">
-             <string>删除表</string>
+           </column>
+          </widget>
+         </item>
+         <item>
+          <widget class="QWidget" name="dbActions" native="true">
+           <layout class="QHBoxLayout" name="dbActionsLayout">
+            <property name="spacing">
+             <number>6</number>
             </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnAlterTable">
-            <property name="text">
-             <string>修改表</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnAddField">
-            <property name="text">
-             <string>添加字段</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnDropField">
-            <property name="text">
-             <string>删除字段</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnAlterField">
-            <property name="text">
-             <string>修改字段</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QVBoxLayout" name="rightLayout">
-        <item>
-         <widget class="QTabWidget" name="dataTableView">
-          <property name="currentIndex">
-           <number>0</number>
-          </property>
-          <widget class="QWidget" name="tabData">
-           <attribute name="title">
-            <string>数据浏览</string>
-           </attribute>
-           <layout class="QVBoxLayout" name="dataTabLayout">
             <item>
-         <layout class="QHBoxLayout" name="recordToolLayout">
-          <item>
-           <widget class="QPushButton" name="btnRefreshData">
-            <property name="text">
-             <string>刷新数据</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnInsertRecord">
-            <property name="text">
-             <string>插入记录</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <spacer name="recordSpacer">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QLabel" name="labelSearch">
-            <property name="text">
-             <string>搜索:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="inputSearch">
-            <property name="placeholderText">
-             <string>输入搜索关键词</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnSearch">
-            <property name="text">
-             <string>搜索</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
+             <widget class="QPushButton" name="btnCreateTable">
+              <property name="text">
+               <string>📋 新建表</string>
+              </property>
+             </widget>
+            </item>
             <item>
-             <widget class="QTableWidget" name="tableData">
-              <property name="alternatingRowColors">
-               <bool>true</bool>
+             <widget class="QPushButton" name="btnDropTable">
+              <property name="text">
+               <string>🗑️ 删除表</string>
               </property>
              </widget>
             </item>
            </layout>
           </widget>
-          <widget class="QWidget" name="tabSchema">
-           <attribute name="title">
-            <string>表结构</string>
-           </attribute>
-           <layout class="QVBoxLayout" name="schemaTabLayout">
+         </item>
+         <item>
+          <widget class="QLabel" name="tableTitle">
+           <property name="text">
+            <string>字段操作</string>
+           </property>
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QWidget" name="tableActions" native="true">
+           <layout class="QGridLayout" name="tableActionsLayout">
+            <property name="spacing">
+             <number>6</number>
+            </property>
+            <item row="0" column="0">
+             <widget class="QPushButton" name="btnAddField">
+              <property name="text">
+               <string>➕ 添加字段</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QPushButton" name="btnDropField">
+              <property name="text">
+               <string>➖ 删除字段</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QPushButton" name="btnAlterTable">
+              <property name="text">
+               <string>✏️ 修改表</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QPushButton" name="btnAlterField">
+              <property name="text">
+               <string>✏️ 修改字段</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="sidebarSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <!-- 右侧主内容 -->
+      <item>
+       <widget class="QWidget" name="mainContent" native="true">
+        <layout class="QVBoxLayout" name="mainContentLayout">
+         <property name="spacing">
+          <number>12</number>
+         </property>
+         <property name="leftMargin">
+          <number>12</number>
+         </property>
+         <property name="topMargin">
+          <number>12</number>
+         </property>
+         <property name="rightMargin">
+          <number>12</number>
+         </property>
+         <property name="bottomMargin">
+          <number>12</number>
+         </property>
+         <!-- 数据操作工具栏 -->
+         <item>
+          <widget class="QWidget" name="dataToolbar" native="true">
+           <layout class="QHBoxLayout" name="dataToolbarLayout">
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <widget class="QPushButton" name="btnRefreshData">
+              <property name="text">
+               <string>🔄 刷新数据</string>
+              </property>
+             </widget>
+            </item>
             <item>
              <widget class="QPushButton" name="btnRefreshSchema">
               <property name="text">
-               <string>刷新结构</string>
+               <string>📋 刷新结构</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QTableWidget" name="tableSchema">
-              <property name="alternatingRowColors">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-          <widget class="QWidget" name="tabSQL">
-           <attribute name="title">
-            <string>SQL执行</string>
-           </attribute>
-           <layout class="QVBoxLayout" name="sqlTabLayout">
-            <item>
-             <widget class="QLabel" name="labelSQL">
+             <widget class="QPushButton" name="btnInsertRecord">
               <property name="text">
-               <string>输入SQL语句 (支持: CREATE/DROP DATABASE/TABLE)</string>
+               <string>➕ 插入</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QTextEdit" name="sqlInput">
+             <spacer name="dataToolbarSpacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QLabel" name="labelSearch">
+              <property name="text">
+               <string>🔍 搜索:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="inputSearch">
               <property name="placeholderText">
-               <string>例如: CREATE DATABASE mydb; 或 CREATE TABLE users (id INT, name TEXT);</string>
+               <string>输入搜索关键词</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="btnExecuteSQL">
+             <widget class="QPushButton" name="btnSearch">
               <property name="text">
-               <string>执行SQL</string>
+               <string>搜索</string>
               </property>
              </widget>
             </item>
            </layout>
           </widget>
-         </widget>
-        </item>
-       </layout>
+         </item>
+         <!-- 标签页 -->
+         <item>
+          <widget class="QTabWidget" name="dataTableView">
+           <property name="currentIndex">
+            <number>0</number>
+           </property>
+           <widget class="QWidget" name="tabData">
+            <attribute name="title">
+             <string>📊 数据浏览</string>
+            </attribute>
+            <layout class="QVBoxLayout" name="dataTabLayout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QTableWidget" name="tableData">
+               <property name="alternatingRowColors">
+                <bool>true</bool>
+               </property>
+               <property name="selectionBehavior">
+                <enum>QAbstractItemView::SelectRows</enum>
+               </property>
+               <property name="gridStyle">
+                <enum>Qt::DotLine</enum>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="tabSchema">
+            <attribute name="title">
+             <string>📋 表结构</string>
+            </attribute>
+            <layout class="QVBoxLayout" name="schemaTabLayout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QTableWidget" name="tableSchema">
+               <property name="alternatingRowColors">
+                <bool>true</bool>
+               </property>
+               <property name="selectionBehavior">
+                <enum>QAbstractItemView::SelectRows</enum>
+               </property>
+               <property name="gridStyle">
+                <enum>Qt::DotLine</enum>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="tabSQL">
+            <attribute name="title">
+             <string>💻 SQL执行</string>
+            </attribute>
+            <layout class="QVBoxLayout" name="sqlTabLayout">
+             <property name="spacing">
+              <number>12</number>
+             </property>
+             <property name="leftMargin">
+              <number>12</number>
+             </property>
+             <property name="topMargin">
+              <number>12</number>
+             </property>
+             <property name="rightMargin">
+              <number>12</number>
+             </property>
+             <property name="bottomMargin">
+              <number>12</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="labelSQL">
+               <property name="text">
+                <string>输入SQL语句 (支持: CREATE/DROP DATABASE/TABLE)</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QTextEdit" name="sqlInput">
+               <property name="placeholderText">
+                <string>例如: CREATE DATABASE mydb; 或 CREATE TABLE users (id INT, name TEXT);</string>
+               </property>
+               <property name="tabStopDistance">
+                <double>40.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnExecuteSQL">
+               <property name="text">
+                <string>🚀 执行SQL</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </item>
+        </layout>
+       </widget>
       </item>
      </layout>
     </item>
+    <!-- 底部日志 -->
     <item>
      <widget class="QTextEdit" name="logOutput">
       <property name="maximumHeight">
@@ -322,7 +745,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>960</width>
+     <width>1200</width>
      <height>24</height>
     </rect>
    </property>
