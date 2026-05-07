@@ -12,6 +12,7 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QElapsedTimer>
+#include <QDir>
 
 // 测试函数声明
 void runAuthTests();
@@ -24,6 +25,7 @@ void runQueryOptimizationTests();
 void runTransactionTests();
 void runLockManagerTests();
 void runMonitorTests();
+void runBackupTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
 static const bool RUN_TESTS_ONLY = true;
@@ -44,6 +46,7 @@ int main(int argc, char *argv[])
         runTransactionTests();
         runLockManagerTests();
         runMonitorTests();
+        runBackupTests();
 
         return 0; // 测试完成直接退出
     }
@@ -1034,4 +1037,79 @@ void runMonitorTests()
     qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
     qDebug() << "║  阶段五 🔴红圈A - 系统监控测试完成                              ║";
     qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 数据备份与恢复测试（阶段五 🔴红圈A - 第二周任务6）
+void runBackupTests()
+{
+    StorageManager storageManager;
+    QString testUser = "testuser";
+    QString testDB = "BackupTestDB";
+    QString testTable = "ImportantData";
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 数据备份与恢复测试                            ║";
+    qDebug() << "║  模块: StorageManager Backup & Restore                         ║";
+    qDebug() << "║  任务: 数据库物理目录拷贝、灾难恢复                            ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // [前置] 创建测试库和表
+    qDebug() << "\n[前置] 创建测试数据库和表...";
+    storageManager.createDatabase(testUser, testDB);
+    QList<Field> fields;
+    fields.append(Field("id", FieldType::INT, 10));
+    storageManager.createTable(testUser, testDB, testTable, fields);
+
+    // 1. 备份数据库
+    qDebug() << "\n[测试1] 执行数据库备份";
+    bool backupResult = storageManager.backupDatabase(testUser, testDB);
+    qDebug() << "备份指令下发结果:" << (backupResult ? "成功 ✓" : "失败 ✗");
+
+    // 2. 自动寻找刚才生成的带有时间戳的备份文件夹
+    QDir userDir("./data/" + testUser);
+    QStringList filters;
+    filters << testDB + "_backup_*"; // 过滤条件
+    // 按时间倒序排列，拿最新的那个
+    QStringList backupFolders = userDir.entryList(filters, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Time);
+
+    if (backupFolders.isEmpty()) {
+        qDebug() << "❌ 致命错误：未找到生成的备份文件夹，测试终止。";
+        return;
+    }
+    QString latestBackup = backupFolders.first();
+    qDebug() << "✅ 成功找到生成的备份文件夹:" << latestBackup;
+
+    // 3. 模拟数据灾难（把原表物理删除）
+    qDebug() << "\n[测试2] 模拟数据破坏 (Drop Table)";
+    storageManager.dropTable(testUser, testDB, testTable);
+
+    bool tdfExists = QFile::exists("./data/" + testUser + "/" + testDB + "/" + testTable + ".tdf");
+    qDebug() << "破坏后验证 .tdf 文件是否存在:" << (tdfExists ? "是 ✗ (未成功删除)" : "否 ✓ (已成功破坏)");
+
+    // 4. 从备份恢复数据
+    qDebug() << "\n[测试3] 从备份目录恢复数据库";
+    bool restoreResult = storageManager.restoreDatabase(testUser, testDB, latestBackup);
+    qDebug() << "恢复指令下发结果:" << (restoreResult ? "成功 ✓" : "失败 ✗");
+
+    // 5. 验证数据是否“复活”
+    qDebug() << "\n[测试4] 验证数据是否成功复活";
+    bool restoredTdfExists = QFile::exists("./data/" + testUser + "/" + testDB + "/" + testTable + ".tdf");
+    qDebug() << "恢复后验证 .tdf 文件是否存在:" << (restoredTdfExists ? "是 ✓" : "否 ✗");
+
+    if (restoreResult && restoredTdfExists) {
+        qDebug() << "\n🎉 测试完美通过! 数据库已具备物理级灾难恢复能力。";
+    } else {
+        qDebug() << "\n💥 测试失败! 请检查文件路径或拷贝逻辑。";
+    }
+
+    // 6. 打扫战场
+    storageManager.dropDatabase(testUser, testDB); // 删除恢复的原库
+    QDir backupDir("./data/" + testUser + "/" + latestBackup);
+    if (backupDir.exists()) {
+        backupDir.removeRecursively(); // 手动把测试用的备份库也删掉
+    }
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 数据备份与恢复测试完成                        ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝\n";
 }

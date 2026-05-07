@@ -166,6 +166,24 @@ public:
      * @brief 重置监控统计数据
      */
     void resetSystemStats();
+
+    // --- 阶段五第二周：数据备份与恢复 (任务6) ---
+
+    /**
+     * @brief 备份数据库：将当前数据库文件夹完整拷贝一份
+     * 备份路径示例：./data/admin/StudentDB_backup_20260507_120000
+     */
+    bool backupDatabase(const QString &username, const QString &dbName);
+
+    /**
+     * @brief 恢复数据库：从指定的备份文件夹还原数据
+     * @param backupFolderName 备份文件夹的名称（不含完整路径）
+     */
+    bool restoreDatabase(const QString &username, const QString &dbName, const QString &backupFolderName);
+
+private:
+    // 内部辅助函数：递归拷贝目录
+    bool copyDirectory(const QString &srcPath, const QString &dstPath);
 };
 
 #endif // STORAGEMANAGER_H

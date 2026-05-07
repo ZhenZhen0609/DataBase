@@ -738,4 +738,102 @@ void StorageManager::resetSystemStats()
     qDebug() << "[Monitor] System statistics have been reset.";
 }
 
+// ========================================================
+// 阶段五第二周：数据备份与恢复 (任务6)
+// ========================================================
+bool StorageManager::backupDatabase(const QString &username, const QString &dbName)
+{
+    QString sourcePath = Config::DATA_PATH + username + "/" + dbName;
+    if (!QDir(sourcePath).exists()) {
+        qDebug() << "[Storage] Backup Error: Source database not found.";
+        return false;
+    }
+
+    // 生成带时间戳的备份文件夹名
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    QString backupPath = sourcePath + "_backup_" + timestamp;
+
+    // 获取该数据库的全局写锁
+    lockManager.acquireWriteLock(username, dbName, "*");
+
+    bool success = copyDirectory(sourcePath, backupPath);
+
+    // ✅ 第一步：先释放锁！
+    lockManager.releaseWriteLock(username, dbName, "*");
+
+    // ✅ 第二步：再执行写日志和打印
+    if (success) {
+        writeLog(username, dbName, "DATABASE BACKUP CREATED: " + backupPath);
+        qDebug() << "[Storage] Backup created successfully at:" << backupPath;
+    } else {
+        qDebug() << "[Storage] Backup failed.";
+    }
+
+    return success;
+}
+
+bool StorageManager::restoreDatabase(const QString &username, const QString &dbName, const QString &backupFolderName)
+{
+    QString sourcePath = Config::DATA_PATH + username + "/" + dbName;
+    QString backupPath = Config::DATA_PATH + username + "/" + backupFolderName;
+
+    if (!QDir(backupPath).exists()) {
+        qDebug() << "[Storage] Restore Error: Backup folder not found.";
+        return false;
+    }
+
+    // 获取最高级别写锁
+    lockManager.acquireWriteLock(username, dbName, "*");
+
+    // 1. 物理删除现有数据库文件夹
+    QDir srcDir(sourcePath);
+    if (srcDir.exists()) {
+        srcDir.removeRecursively();
+    }
+
+    // 2. 将备份内容拷贝回原位置
+    bool success = copyDirectory(backupPath, sourcePath);
+
+    if (success) {
+        // 恢复后清空一下内存缓存
+        dataCache.clear();
+    }
+
+    // ✅ 第一步：先释放锁！
+    lockManager.releaseWriteLock(username, dbName, "*");
+
+    // ✅ 第二步：再执行写日志和打印
+    if (success) {
+        writeLog(username, dbName, "DATABASE RESTORED FROM: " + backupFolderName);
+        qDebug() << "[Storage] Database restored successfully from:" << backupFolderName;
+    }
+
+    return success;
+}
+
+// 递归拷贝辅助函数
+bool StorageManager::copyDirectory(const QString &srcPath, const QString &dstPath)
+{
+    QDir sourceDir(srcPath);
+    if (!sourceDir.exists()) return false;
+
+    QDir destDir(dstPath);
+    if (!destDir.exists()) {
+        destDir.mkpath(dstPath);
+    }
+
+    foreach (QString fileName, sourceDir.entryList(QDir::Files)) {
+        QString srcFilePath = srcPath + "/" + fileName;
+        QString dstFilePath = dstPath + "/" + fileName;
+        if (!QFile::copy(srcFilePath, dstFilePath)) return false;
+    }
+
+    foreach (QString subDirName, sourceDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        QString srcSubPath = srcPath + "/" + subDirName;
+        QString dstSubPath = dstPath + "/" + subDirName;
+        if (!copyDirectory(srcSubPath, dstSubPath)) return false;
+    }
+
+    return true;
+}
 
