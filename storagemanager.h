@@ -5,7 +5,9 @@
 #include <QFile>
 #include <QDataStream>
 #include <QDateTime>
+#include <QHash>
 #include "common.h"
+#include "lockmanager.h"
 
     //定义表格信息块的物理存储结构
     struct TableBlock {
@@ -27,9 +29,18 @@ private:
      * @brief 内部辅助函数：向指定数据库的 ruanko.log 中追加日志
      */
     void writeLog(const QString &username, const QString &dbName, const QString &logMessage);
+    
+    /**
+     * @brief 读写锁管理器
+     */
+    LockManager lockManager;
+
+    // 简单查询缓存池 (Key: 数据库名_表名, Value: 表数据的二进制块)
+    QHash<QString, QByteArray> dataCache;
 
 public:
     StorageManager();
+    ~StorageManager();
 
     bool createDatabase(const QString &username, const QString &dbName);
     //快速建表
@@ -45,6 +56,70 @@ public:
     bool dropDatabase(const QString &username, const QString &dbName);
     // 表结构变更 (修改字段)
     bool alterTable(const QString &username, const QString &dbName, const QString &tableName, const QList<Field> &newFields);
+
+    /**
+     * @brief 创建索引文件（在建表时自动调用主键索引）
+     * @param username 用户名
+     * @param dbName 数据库名
+     * @param tableName 表名
+     * @param fieldName 字段名
+     * @param fieldType 字段类型
+     * @return true成功，false失败
+     */
+    bool createIndexFile(const QString &username, const QString &dbName,
+                         const QString &tableName, const QString &fieldName, FieldType fieldType);
+
+    /**
+     * @brief 删除索引文件
+     * @param username 用户名
+     * @param dbName 数据库名
+     * @param tableName 表名
+     * @param fieldName 字段名
+     * @return true成功，false失败
+     */
+    bool dropIndexFile(const QString &username, const QString &dbName,
+                       const QString &tableName, const QString &fieldName);
+
+    /**
+     * @brief 开始事务
+     * @param username 用户名
+     * @param dbName 数据库名
+     * @return true成功，false失败
+     */
+    bool beginTransaction(const QString &username, const QString &dbName);
+
+    /**
+     * @brief 提交事务
+     * @param username 用户名
+     * @param dbName 数据库名
+     * @return true成功，false失败
+     */
+    bool commitTransaction(const QString &username, const QString &dbName);
+
+    /**
+     * @brief 回滚事务
+     * @param username 用户名
+     * @param dbName 数据库名
+     * @return true成功，false失败
+     */
+    bool rollbackTransaction(const QString &username, const QString &dbName);
+
+    // 阶段五：查询性能优化与缓存接口 ---
+
+    /**
+     * @brief 优化数据读取：带缓存机制地读取 .trd 数据文件
+     */
+    QByteArray readTableData(const QString &username, const QString &dbName, const QString &tableName);
+
+    /**
+     * @brief 优化数据写入：写入 .trd 文件并同步更新缓存
+     */
+    bool writeTableData(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data);
+
+    /**
+     * @brief 清除特定表的内存缓存 (在删表或删库时调用)
+     */
+    void clearTableCache(const QString &dbName, const QString &tableName);
 };
 
 #endif // STORAGEMANAGER_H

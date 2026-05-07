@@ -1,4 +1,5 @@
 #include "storagemanager.h"
+#include "indexmanager.h"
 #include <QDir>
 #include <QDebug>
 #include <cstring>
@@ -9,6 +10,8 @@
 #include <QTextStream>
 
 StorageManager::StorageManager() {}
+
+StorageManager::~StorageManager() {}
 
 //建库
 bool StorageManager::createDatabase(const QString &username, const QString &dbName)
@@ -28,10 +31,17 @@ bool StorageManager::createDatabase(const QString &username, const QString &dbNa
         qDebug() << "[Storage] Error: Database already exists:" << dbName;
         return false;
     }
+    
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, "*");
+    
     if (dir.mkdir(dbPath)) {
         qDebug() << QString("[Storage] Folder \"%1\" created successfully.").arg(dbPath);
+        lockManager.releaseWriteLock(username, dbName, "*");
         return true;
     }
+    
+    lockManager.releaseWriteLock(username, dbName, "*");
     return false;
 }
 
@@ -74,15 +84,23 @@ bool StorageManager::createTable(const QString &username, QString dbName, QStrin
     block.crtime = QDateTime::currentSecsSinceEpoch();
     block.mtime = block.crtime;
 
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, tableName);
+    
     QFile tbFile(tbPath);
     if (tbFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
         tbFile.write(reinterpret_cast<const char*>(&block), sizeof(TableBlock));
         tbFile.close();
         qDebug() << QString("[Storage] Table %1 created in %2. files: .tdf and .trd generated.").arg(tableName, dbName);
+        // ✅ 先释放表锁
+        lockManager.releaseWriteLock(username, dbName, tableName);
+
+        // ✅ 再调用获取全局日志锁的 writeLog
         writeLog(username, dbName, QString("CREATE TABLE: %1. Fields: 0").arg(tableName));
         return true;
     } else {
         qDebug() << "[Storage] Error: Failed to update .tb file.";
+        lockManager.releaseWriteLock(username, dbName, tableName);
         return false;
     }
 }
@@ -99,13 +117,21 @@ bool StorageManager::writeTableDefinition(const QString &username, const QString
 
     QString tdfPath = dir.filePath(tableName + ".tdf");
     QFile tdfFile(tdfPath);
+    
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, tableName);
+    
     if (!tdfFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qDebug() << "[Storage] Failed to open .tdf file for writing:" << tdfPath;
+        lockManager.releaseWriteLock(username, dbName, tableName);
         return false;
     }
 
     tdfFile.write(data);
     tdfFile.close();
+    
+    lockManager.releaseWriteLock(username, dbName, tableName);
+    
     qDebug() << QString("[Storage] Written table definition to %1").arg(tdfPath);
     return true;
 }
@@ -172,13 +198,19 @@ bool StorageManager::createTable(const QString &username, QString dbName, QStrin
     block.crtime = QDateTime::currentSecsSinceEpoch();
     block.mtime = block.crtime;
 
+    // 获取写锁，防止并发写入
+    lockManager.acquireWriteLock(username, dbName, tableName);
+    
     QFile tbFile(tbPath);
     if (!tbFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
         qDebug() << "[Storage] Error: Failed to update .tb file.";
+        lockManager.releaseWriteLock(username, dbName, tableName);
         return false;
     }
     tbFile.write(reinterpret_cast<const char*>(&block), sizeof(TableBlock));
     tbFile.close();
+    
+    lockManager.releaseWriteLock(username, dbName, tableName);
 
     writeLog(username, dbName, QString("CREATE TABLE: %1. Fields: %2").arg(tableName).arg(fields.size()));
     qDebug() << QString("[Storage] Table %1 created in %2 with %3 fields. files: .tdf, .trd generated.")
@@ -197,13 +229,19 @@ QList<Field> StorageManager::loadTableSchema(const QString &username, QString db
         return QList<Field>();
     }
 
+    // 获取读锁
+    lockManager.acquireReadLock(username, dbName, tableName);
+    
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qDebug() << "[Storage] Error: Failed to open .tdf file:" << tdfPath;
+        lockManager.releaseReadLock(username, dbName, tableName);
         return QList<Field>();
     }
 
     QByteArray data = file.readAll();
     file.close();
+    
+    lockManager.releaseReadLock(username, dbName, tableName);
 
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isObject()) {
@@ -240,35 +278,40 @@ bool StorageManager::dropTable(const QString &username, const QString &dbName, c
         return false;
     }
 
-    // 锁定你要删除的两个目标文件
     QString tdfPath = dir.filePath(tableName + ".tdf");
     QString trdPath = dir.filePath(tableName + ".trd");
 
     QFile tdfFile(tdfPath);
     QFile trdFile(trdPath);
 
+    // 1. 获取写锁
+    lockManager.acquireWriteLock(username, dbName, tableName);
+
     bool success = true;
 
-    // 检查并删除 .tdf 文件
+    // 2. 物理删除文件
     if (tdfFile.exists()) {
-        if (!tdfFile.remove()) {
-            qDebug() << "[Storage] Error: Failed to remove .tdf file. It might be in use by another stream.";
-            success = false;
-        }
+        if (!tdfFile.remove()) success = false;
     }
-
-    // 检查并删除 .trd 文件
     if (trdFile.exists()) {
-        if (!trdFile.remove()) {
-            qDebug() << "[Storage] Error: Failed to remove .trd file. It might be in use.";
-            success = false;
-        }
+        if (!trdFile.remove()) success = false;
     }
 
     if (success) {
-        writeLog(username, dbName, QString("DROP TABLE: %1").arg(tableName));
         qDebug() << QString("[Storage] Table %1 dropped successfully from %2.").arg(tableName, dbName);
     }
+
+    // 3. ✅ 释放表锁
+    lockManager.releaseWriteLock(username, dbName, tableName);
+
+    // 4. ✅ 释放锁后再执行写日志（防止日志操作尝试获取锁时产生死锁）
+    if (success) {
+        writeLog(username, dbName, QString("DROP TABLE: %1").arg(tableName));
+    }
+
+    // 5. ✅ 清除对应的内存缓存
+    clearTableCache(dbName, tableName);
+
     return success;
 }
 
@@ -283,12 +326,20 @@ bool StorageManager::dropDatabase(const QString &username, const QString &dbName
         return false;
     }
 
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, "*");
+    
     // removeRecursively() 会删除该目录下的所有文件以及目录本身
     if (dir.removeRecursively()) {
         qDebug() << QString("[Storage] Database %1 and all its files dropped successfully.").arg(dbName);
+
+        dataCache.clear();
+
+        lockManager.releaseWriteLock(username, dbName, "*");
         return true;
     } else {
         qDebug() << "[Storage] Error: Failed to drop database. Some files might be locked/in use.";
+        lockManager.releaseWriteLock(username, dbName, "*");
         return false;
     }
 }
@@ -311,6 +362,7 @@ bool StorageManager::alterTable(const QString &username, const QString &dbName, 
         return false;
     }
 
+
     // 1. 更新 .tdf 文件 (把最新的字段结构序列化为 JSON 覆盖进去)
     QJsonObject schemaObj;
     schemaObj["tableName"] = tableName;
@@ -331,38 +383,43 @@ bool StorageManager::alterTable(const QString &username, const QString &dbName, 
 
     if (!writeTableDefinition(username, dbName, tableName, schemaData)) {
         qDebug() << "[Storage] Error: Failed to rewrite .tdf file.";
+
         return false;
     }
 
     // 2. 更新 .tb 二进制表头文件中的 field_num 和 mtime
+    // ✅ 在这里才开始加锁！仅保护 .tb 文件的写入
+    lockManager.acquireWriteLock(username, dbName, tableName);
     QFile tbFile(tbPath);
     // 使用 ReadWrite 模式，既能读找位置，又能写，且不会清空原文件
-    if (tbFile.open(QIODevice::ReadWrite)) {
-        TableBlock block;
-        bool found = false;
-        qint64 pos = 0; // 记录当前游标位置
-
-        // 遍历二进制文件中的所有 TableBlock
-        while (tbFile.read(reinterpret_cast<char*>(&block), sizeof(TableBlock)) == sizeof(TableBlock)) {
-            if (QString(block.name) == tableName) {
-                found = true;
-                break;
-            }
-            pos += sizeof(TableBlock);
-        }
-
-        if (found) {
-            block.field_num = newFields.size(); // 更新字段数
-            block.mtime = QDateTime::currentSecsSinceEpoch(); // 更新修改时间
-
-            tbFile.seek(pos); // 把游标指针拨回到这个块的开头
-            tbFile.write(reinterpret_cast<const char*>(&block), sizeof(TableBlock)); // 覆盖重写
-        }
-        tbFile.close();
-    } else {
+    if (!tbFile.open(QIODevice::ReadWrite)) {
         qDebug() << "[Storage] Error: Failed to open .tb file for altering.";
+        lockManager.releaseWriteLock(username, dbName, tableName);
         return false;
     }
+    TableBlock block;
+    bool found = false;
+    qint64 pos = 0; // 记录当前游标位置
+
+    // 遍历二进制文件中的所有 TableBlock
+    while (tbFile.read(reinterpret_cast<char*>(&block), sizeof(TableBlock)) == sizeof(TableBlock)) {
+        if (QString(block.name) == tableName) {
+            found = true;
+            break;
+        }
+        pos += sizeof(TableBlock);
+    }
+
+    if (found) {
+        block.field_num = newFields.size(); // 更新字段数
+        block.mtime = QDateTime::currentSecsSinceEpoch(); // 更新修改时间
+
+        tbFile.seek(pos); // 把游标指针拨回到这个块的开头
+        tbFile.write(reinterpret_cast<const char*>(&block), sizeof(TableBlock)); // 覆盖重写
+    }
+    tbFile.close();
+    
+    lockManager.releaseWriteLock(username, dbName, tableName);
 
     writeLog(username, dbName, QString("ALTER TABLE: %1. Fields modified.").arg(tableName));
     qDebug() << QString("[Storage] Table %1 altered successfully. New field count: %2.").arg(tableName).arg(newFields.size());
@@ -377,6 +434,9 @@ void StorageManager::writeLog(const QString &username, const QString &dbName, co
     QFile logFile(logPath);
 
     // 以追加 (Append) 和文本 (Text) 模式打开。如果文件不存在会自动创建。
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, "*");
+    
     if (logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
         QTextStream out(&logFile);
         // 生成标准时间戳格式
@@ -388,4 +448,234 @@ void StorageManager::writeLog(const QString &username, const QString &dbName, co
     } else {
         qDebug() << "[Storage] Warning: Could not write to log file:" << logPath;
     }
+    
+    lockManager.releaseWriteLock(username, dbName, "*");
 }
+
+//创建索引文件
+bool StorageManager::createIndexFile(const QString &username, const QString &dbName,
+                                      const QString &tableName, const QString &fieldName, FieldType fieldType)
+{
+    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QDir dir(dbPath);
+    if (!dir.exists()) {
+        qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
+        return false;
+    }
+
+    // 创建索引目录
+    QString indexDir = dir.filePath("indexes");
+    if (!dir.exists(indexDir)) {
+        if (!dir.mkpath(indexDir)) {
+            qDebug() << "[Storage] Error: Failed to create indexes directory";
+            return false;
+        }
+    }
+
+    // 创建索引文件路径
+    QString indexFilePath = QString("%1/%2_%3.tid")
+                            .arg(indexDir)
+                            .arg(fieldName)
+                            .arg(tableName);
+
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, tableName);
+
+    // 创建空的索引文件
+    QFile indexFile(indexFilePath);
+    if (!indexFile.open(QIODevice::WriteOnly)) {
+        qDebug() << "[Storage] Error: Failed to create index file:" << indexFilePath;
+        lockManager.releaseWriteLock(username, dbName, tableName);
+        return false;
+    }
+    indexFile.close();
+    
+    lockManager.releaseWriteLock(username, dbName, tableName);
+
+    qDebug() << QString("[Storage] Index file created: %1").arg(indexFilePath);
+    return true;
+}
+
+//删除索引文件
+bool StorageManager::dropIndexFile(const QString &username, const QString &dbName,
+                                    const QString &tableName, const QString &fieldName)
+{
+    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QDir dir(dbPath);
+    if (!dir.exists()) {
+        qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
+        return false;
+    }
+
+    QString indexFilePath = QString("%1/indexes/%2_%3.tid")
+                            .arg(dbPath)
+                            .arg(fieldName)
+                            .arg(tableName);
+
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, tableName);
+
+    QFile indexFile(indexFilePath);
+    if (!indexFile.exists()) {
+        qDebug() << "[Storage] Warning: Index file does not exist:" << indexFilePath;
+        lockManager.releaseWriteLock(username, dbName, tableName);
+        return false;
+    }
+
+    bool success = indexFile.remove();
+    
+    lockManager.releaseWriteLock(username, dbName, tableName);
+    
+    if (success) {
+        qDebug() << QString("[Storage] Index file deleted: %1").arg(indexFilePath);
+        return true;
+    } else {
+        qDebug() << "[Storage] Error: Failed to delete index file:" << indexFilePath;
+        return false;
+    }
+}
+
+// ========================================================
+// 阶段五：查询性能优化与缓存机制 (第一周补全)
+// ========================================================
+
+// 带缓存机制的读取
+QByteArray StorageManager::readTableData(const QString &username, const QString &dbName, const QString &tableName)
+{
+    QString cacheKey = dbName + "_" + tableName;
+
+    // 获取读锁
+    lockManager.acquireReadLock(username, dbName, tableName);
+
+    // 1. 尝试从缓存中命中
+    if (dataCache.contains(cacheKey)) {
+        QByteArray cachedData = dataCache.value(cacheKey);
+        lockManager.releaseReadLock(username, dbName, tableName);
+        // qDebug() << "[Storage] Cache HIT for table:" << tableName; // 测试时可解开注释看效果
+        return cachedData;
+    }
+
+    // 2. 缓存未命中，从物理磁盘读取
+    QString trdPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".trd";
+    QFile trdFile(trdPath);
+
+    if (!trdFile.open(QIODevice::ReadOnly)) {
+        qDebug() << "[Storage] Error: Failed to read .trd file:" << trdPath;
+        lockManager.releaseReadLock(username, dbName, tableName);
+        return QByteArray();
+    }
+    QByteArray data = trdFile.readAll();
+    trdFile.close();
+
+    // 3. 写入缓存，以便下次极速读取
+    dataCache.insert(cacheKey, data);
+    lockManager.releaseReadLock(username, dbName, tableName);
+
+    // qDebug() << "[Storage] Disk read & Cache UPDATED for table:" << tableName;
+    return data;
+}
+
+// 同步写入硬盘与缓存
+bool StorageManager::writeTableData(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data)
+{
+    QString trdPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".trd";
+    QFile trdFile(trdPath);
+
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, tableName);
+
+    if (!trdFile.open(QIODevice::WriteOnly)) {
+        qDebug() << "[Storage] Error: Failed to write .trd file:" << trdPath;
+        lockManager.releaseWriteLock(username, dbName, tableName);
+        return false;
+    }
+    trdFile.write(data);
+    trdFile.close();
+
+    // 同步更新缓存，防止脏读
+    QString cacheKey = dbName + "_" + tableName;
+    dataCache.insert(cacheKey, data);
+
+    lockManager.releaseWriteLock(username, dbName, tableName);
+    return true;
+}
+
+// 清除特定缓存
+void StorageManager::clearTableCache(const QString &dbName, const QString &tableName)
+{
+    QString cacheKey = dbName + "_" + tableName;
+    dataCache.remove(cacheKey);
+}
+
+//开始事务
+bool StorageManager::beginTransaction(const QString &username, const QString &dbName)
+{
+    QString logPath = Config::DATA_PATH + username + "/" + dbName + "/ruanko.log";
+    QFile logFile(logPath);
+
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, "*");
+
+    if (logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        QTextStream out(&logFile);
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
+        out << "[" << timestamp << "] BEGIN TRANSACTION" << "\n";
+        logFile.close();
+        qDebug() << QString("[Storage] Transaction started for database: %1").arg(dbName);
+        lockManager.releaseWriteLock(username, dbName, "*");
+        return true;
+    } else {
+        qDebug() << "[Storage] Error: Could not write to log file:" << logPath;
+        lockManager.releaseWriteLock(username, dbName, "*");
+        return false;
+    }
+}
+
+//提交事务
+bool StorageManager::commitTransaction(const QString &username, const QString &dbName)
+{
+    QString logPath = Config::DATA_PATH + username + "/" + dbName + "/ruanko.log";
+    QFile logFile(logPath);
+
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, "*");
+
+    if (logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        QTextStream out(&logFile);
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
+        out << "[" << timestamp << "] COMMIT TRANSACTION" << "\n";
+        logFile.close();
+        qDebug() << QString("[Storage] Transaction committed for database: %1").arg(dbName);
+        lockManager.releaseWriteLock(username, dbName, "*");
+        return true;
+    } else {
+        qDebug() << "[Storage] Error: Could not write to log file:" << logPath;
+        lockManager.releaseWriteLock(username, dbName, "*");
+        return false;
+    }
+}
+
+//回滚事务
+bool StorageManager::rollbackTransaction(const QString &username, const QString &dbName)
+{
+    QString logPath = Config::DATA_PATH + username + "/" + dbName + "/ruanko.log";
+    QFile logFile(logPath);
+
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, "*");
+
+    if (logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        QTextStream out(&logFile);
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
+        out << "[" << timestamp << "] ROLLBACK TRANSACTION" << "\n";
+        logFile.close();
+        qDebug() << QString("[Storage] Transaction rolled back for database: %1").arg(dbName);
+        lockManager.releaseWriteLock(username, dbName, "*");
+        return true;
+    } else {
+        qDebug() << "[Storage] Error: Could not write to log file:" << logPath;
+        lockManager.releaseWriteLock(username, dbName, "*");
+        return false;
+    }
+}
+
