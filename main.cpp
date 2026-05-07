@@ -11,6 +11,7 @@
 #include <QDebug>
 #include <QJsonArray>
 #include <QFile>
+#include <QElapsedTimer>
 
 // 测试函数声明
 void runAuthTests();
@@ -22,6 +23,7 @@ void runIndexTests();
 void runQueryOptimizationTests();
 void runTransactionTests();
 void runLockManagerTests();
+void runMonitorTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
 static const bool RUN_TESTS_ONLY = true;
@@ -41,6 +43,7 @@ int main(int argc, char *argv[])
         runQueryOptimizationTests();
         runTransactionTests();
         runLockManagerTests();
+        runMonitorTests();
 
         return 0; // 测试完成直接退出
     }
@@ -988,5 +991,47 @@ void runLockManagerTests()
 
     qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
     qDebug() << "║  阶段五 🔴红圈A - 并发控制测试完成                              ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 系统监控测试（阶段五 🔴红圈A - 第二周任务5）
+void runMonitorTests()
+{
+    StorageManager storageManager;
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 系统监控测试                                  ║";
+    qDebug() << "║  模块: StorageManager Monitor                                  ║";
+    qDebug() << "║  任务: 性能统计、磁盘I/O监控、查询耗时计算                     ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 1. 测试磁盘读取监控 (读取不存在的表也会触发一次物理查找尝试)
+    storageManager.readTableData("testuser", "MonitorDB", "table_a");
+    storageManager.readTableData("testuser", "MonitorDB", "table_b");
+
+    // 2. 测试磁盘写入监控
+    storageManager.writeTableData("testuser", "MonitorDB", "table_c", QByteArray("data"));
+
+    // 3. 模拟上层引擎 (橙圈B/蓝圈C) 执行查询并上报耗时
+    QElapsedTimer timer;
+
+    // 模拟一次慢查询 (假装耗时 45ms)
+    timer.start();
+    // (假装在做复杂的 SQL 解析和 WHERE 过滤)
+    storageManager.recordQueryTime(45);
+
+    // 模拟一次快查询 (假装耗时 5ms，例如命中了你第一周写的缓存)
+    timer.start();
+    storageManager.recordQueryTime(5);
+
+    // 4. 打印系统监控报告
+    qDebug() << "\n[测试验证] 打印系统运行报告：";
+    storageManager.printSystemStats();
+
+    // 5. 验证重置功能
+    storageManager.resetSystemStats();
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 系统监控测试完成                              ║";
     qDebug() << "╚════════════════════════════════════════════════════════════════╝";
 }

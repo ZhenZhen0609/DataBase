@@ -556,6 +556,7 @@ QByteArray StorageManager::readTableData(const QString &username, const QString 
     }
 
     // 2. 缓存未命中，从物理磁盘读取
+    recordDiskRead(); // 埋点记录物理磁盘读取
     QString trdPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".trd";
     QFile trdFile(trdPath);
 
@@ -578,6 +579,8 @@ QByteArray StorageManager::readTableData(const QString &username, const QString 
 // 同步写入硬盘与缓存
 bool StorageManager::writeTableData(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data)
 {
+    recordDiskWrite(); // 埋点记录物理磁盘写入
+
     QString trdPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".trd";
     QFile trdFile(trdPath);
 
@@ -677,5 +680,62 @@ bool StorageManager::rollbackTransaction(const QString &username, const QString 
         lockManager.releaseWriteLock(username, dbName, "*");
         return false;
     }
+
 }
+
+// ========================================================
+// 阶段五第二周：系统监控功能 (任务5)
+// ========================================================
+
+void StorageManager::recordQueryTime(qint64 timeMs)
+{
+    // 获取写锁保护监控数据的并发修改 (这里为了性能可以使用简单的互斥锁，但复用 lockManager 的全局锁亦可)
+    lockManager.acquireWriteLock("SYSTEM", "MONITOR", "STATS");
+    monitorStats.queryCount++;
+    monitorStats.totalQueryTimeMs += timeMs;
+    lockManager.releaseWriteLock("SYSTEM", "MONITOR", "STATS");
+}
+
+void StorageManager::recordDiskRead()
+{
+    lockManager.acquireWriteLock("SYSTEM", "MONITOR", "STATS");
+    monitorStats.totalDiskReads++;
+    lockManager.releaseWriteLock("SYSTEM", "MONITOR", "STATS");
+}
+
+void StorageManager::recordDiskWrite()
+{
+    lockManager.acquireWriteLock("SYSTEM", "MONITOR", "STATS");
+    monitorStats.totalDiskWrites++;
+    lockManager.releaseWriteLock("SYSTEM", "MONITOR", "STATS");
+}
+
+SystemMonitorStats StorageManager::getSystemStats() const
+{
+    return monitorStats;
+}
+
+void StorageManager::printSystemStats() const
+{
+    qDebug() << "\n📊 === DBMS 系统性能监控报告 ===";
+    qDebug() << "💿 物理磁盘读取次数 :" << monitorStats.totalDiskReads << "(未命中缓存次数)";
+    qDebug() << "💾 物理磁盘写入次数 :" << monitorStats.totalDiskWrites;
+    qDebug() << "🔍 记录的总查询次数 :" << monitorStats.queryCount;
+    if (monitorStats.queryCount > 0) {
+        double avgTime = static_cast<double>(monitorStats.totalQueryTimeMs) / monitorStats.queryCount;
+        qDebug() << "⏱️ 平均查询执行耗时 :" << avgTime << "ms";
+    } else {
+        qDebug() << "⏱️ 平均查询执行耗时 : 0 ms";
+    }
+    qDebug() << "=================================\n";
+}
+
+void StorageManager::resetSystemStats()
+{
+    lockManager.acquireWriteLock("SYSTEM", "MONITOR", "STATS");
+    monitorStats = SystemMonitorStats();
+    lockManager.releaseWriteLock("SYSTEM", "MONITOR", "STATS");
+    qDebug() << "[Monitor] System statistics have been reset.";
+}
+
 

@@ -9,6 +9,17 @@
 #include "common.h"
 #include "lockmanager.h"
 
+// 阶段五第二周：系统监控统计结构体
+struct SystemMonitorStats {
+    int totalDiskReads;       // 物理磁盘读次数 (未命中缓存)
+    int totalDiskWrites;      // 物理磁盘写次数
+    qint64 totalQueryTimeMs;  // 累计查询执行总耗时 (毫秒)
+    int queryCount;           // 执行的查询总次数
+
+    // 构造函数初始化为0
+    SystemMonitorStats() : totalDiskReads(0), totalDiskWrites(0), totalQueryTimeMs(0), queryCount(0) {}
+};
+
     //定义表格信息块的物理存储结构
     struct TableBlock {
     char name[128];       // 表格名称
@@ -37,6 +48,9 @@ private:
 
     // 简单查询缓存池 (Key: 数据库名_表名, Value: 表数据的二进制块)
     QHash<QString, QByteArray> dataCache;
+
+    // 系统监控数据存储
+    SystemMonitorStats monitorStats;
 
 public:
     StorageManager();
@@ -120,6 +134,38 @@ public:
      * @brief 清除特定表的内存缓存 (在删表或删库时调用)
      */
     void clearTableCache(const QString &dbName, const QString &tableName);
+
+    // 阶段五第二周：系统监控接口 ---
+
+    /**
+     * @brief 记录一次查询耗时 (供蓝圈C或橙圈B在查询结束时调用)
+     */
+    void recordQueryTime(qint64 timeMs);
+
+    /**
+     * @brief 记录一次物理磁盘读操作
+     */
+    void recordDiskRead();
+
+    /**
+     * @brief 记录一次物理磁盘写操作
+     */
+    void recordDiskWrite();
+
+    /**
+     * @brief 获取当前系统监控统计数据
+     */
+    SystemMonitorStats getSystemStats() const;
+
+    /**
+     * @brief 打印系统监控报告到控制台
+     */
+    void printSystemStats() const;
+
+    /**
+     * @brief 重置监控统计数据
+     */
+    void resetSystemStats();
 };
 
 #endif // STORAGEMANAGER_H
