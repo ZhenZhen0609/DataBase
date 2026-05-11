@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
+#include "queryengine.h"
 
 #include <QInputDialog>
 #include <QMessageBox>
@@ -24,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_record(new RecordManager())
     , m_storage(new StorageManager())
     , m_parser(new SQLParser(this))
+    , m_queryEngine(new QueryEngine(this))
 {
     ui->setupUi(this);
 
@@ -75,8 +77,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableSchema->setColumnCount(5);
     ui->tableSchema->setHorizontalHeaderLabels({"字段名", "类型", "长度", "非空", "主键"});
 
-    // 初始化SQL解析器
+    // 将StorageManager和QueryEngine注入SQLParser
     m_parser->setStorageManager(m_storage);
+    m_parser->setQueryEngine(m_queryEngine);
 
     log("系统就绪，请先登录。默认账号: admin / 123456");
 }
@@ -139,6 +142,8 @@ void MainWindow::onLogin()
         m_currentUser = username;
         m_loggedIn = true;
         m_parser->setCurrentUser(username);
+        // 同步当前用户到查询引擎
+        m_queryEngine->setCurrentUser(username);
         ui->labelWelcome->setText("欢迎, " + username);
         ui->labelWelcome->setStyleSheet("color: green;");
         log("登录成功: " + username);
@@ -197,8 +202,8 @@ void MainWindow::onCreateTable()
 
     // 获取字段定义
     QString fieldsStr = QInputDialog::getText(this, "字段定义",
-        "字段定义 (格式: 字段名 类型, ...)\n类型: INT, TEXT, DOUBLE, BOOLEAN",
-        QLineEdit::Normal, "id INT, name TEXT", &ok);
+                                              "字段定义 (格式: 字段名 类型, ...)\n类型: INT, TEXT, DOUBLE, BOOLEAN",
+                                              QLineEdit::Normal, "id INT, name TEXT", &ok);
     if (!ok) return;
 
     QList<Field> fields;
@@ -209,8 +214,8 @@ void MainWindow::onCreateTable()
             Field f;
             f.name = pair[0];
             f.type = pair[1].toUpper() == "INT" ? FieldType::INT :
-                     pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
-                     pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
+                         pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
+                         pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
             f.length = (f.type == FieldType::INT) ? 10 : 255;
             fields.append(f);
         }
@@ -268,16 +273,16 @@ void MainWindow::onAlterTable()
     QString currentFields;
     for (const Field &f : fields) {
         currentFields += f.name + " " +
-            (f.type == FieldType::INT ? "INT" :
-             f.type == FieldType::DOUBLE ? "DOUBLE" :
-             f.type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT") + ", ";
+                         (f.type == FieldType::INT ? "INT" :
+                              f.type == FieldType::DOUBLE ? "DOUBLE" :
+                              f.type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT") + ", ";
     }
     currentFields.chop(2);
 
     bool ok;
     QString newFieldsStr = QInputDialog::getText(this, "修改表结构",
-        "当前字段:\n" + currentFields + "\n\n输入新字段定义:",
-        QLineEdit::Normal, currentFields, &ok);
+                                                 "当前字段:\n" + currentFields + "\n\n输入新字段定义:",
+                                                 QLineEdit::Normal, currentFields, &ok);
     if (!ok) return;
 
     // 解析新字段
@@ -289,8 +294,8 @@ void MainWindow::onAlterTable()
             Field f;
             f.name = pair[0];
             f.type = pair[1].toUpper() == "INT" ? FieldType::INT :
-                     pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
-                     pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
+                         pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
+                         pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
             f.length = (f.type == FieldType::INT) ? 10 : 255;
             newFields.append(f);
         }
@@ -328,17 +333,17 @@ void MainWindow::onAddField()
     QString currentFields;
     for (const Field &f : fields) {
         currentFields += f.name + " " +
-            (f.type == FieldType::INT ? "INT" :
-             f.type == FieldType::DOUBLE ? "DOUBLE" :
-             f.type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT") + ", ";
+                         (f.type == FieldType::INT ? "INT" :
+                              f.type == FieldType::DOUBLE ? "DOUBLE" :
+                              f.type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT") + ", ";
     }
     currentFields.chop(2);
 
     // 输入新字段
     bool ok;
     QString newFieldStr = QInputDialog::getText(this, "添加字段",
-        "当前字段:\n" + currentFields + "\n\n输入新字段定义 (格式: 字段名 类型):",
-        QLineEdit::Normal, "", &ok);
+                                                "当前字段:\n" + currentFields + "\n\n输入新字段定义 (格式: 字段名 类型):",
+                                                QLineEdit::Normal, "", &ok);
     if (!ok) return;
 
     QStringList pair = newFieldStr.trimmed().split(' ', Qt::SkipEmptyParts);
@@ -350,8 +355,8 @@ void MainWindow::onAddField()
     Field newField;
     newField.name = pair[0];
     newField.type = pair[1].toUpper() == "INT" ? FieldType::INT :
-                    pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
-                    pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
+                        pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
+                        pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
     newField.length = (newField.type == FieldType::INT) ? 10 : 255;
 
     fields.append(newField);
@@ -454,21 +459,21 @@ void MainWindow::onAlterField()
 
     // 显示当前字段信息
     QString currentInfo = QString("字段名: %1\n类型: %2\n长度: %3\n非空: %4\n主键: %5")
-        .arg(targetField->name)
-        .arg(targetField->type == FieldType::INT ? "INT" :
-             targetField->type == FieldType::DOUBLE ? "DOUBLE" :
-             targetField->type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT")
-        .arg(targetField->length)
-        .arg(targetField->isNotNull ? "是" : "否")
-        .arg(targetField->isPrimaryKey ? "是" : "否");
+                              .arg(targetField->name)
+                              .arg(targetField->type == FieldType::INT ? "INT" :
+                                       targetField->type == FieldType::DOUBLE ? "DOUBLE" :
+                                       targetField->type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT")
+                              .arg(targetField->length)
+                              .arg(targetField->isNotNull ? "是" : "否")
+                              .arg(targetField->isPrimaryKey ? "是" : "否");
 
     // 输入新字段信息
     QString newFieldStr = QInputDialog::getText(this, "修改字段",
-        currentInfo + "\n\n输入新字段定义 (格式: 字段名 类型):",
-        QLineEdit::Normal, fieldName + " " +
-        (targetField->type == FieldType::INT ? "INT" :
-         targetField->type == FieldType::DOUBLE ? "DOUBLE" :
-         targetField->type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT"), &ok);
+                                                currentInfo + "\n\n输入新字段定义 (格式: 字段名 类型):",
+                                                QLineEdit::Normal, fieldName + " " +
+                                                    (targetField->type == FieldType::INT ? "INT" :
+                                                         targetField->type == FieldType::DOUBLE ? "DOUBLE" :
+                                                         targetField->type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT"), &ok);
     if (!ok) return;
 
     QStringList pair = newFieldStr.trimmed().split(' ', Qt::SkipEmptyParts);
@@ -480,8 +485,8 @@ void MainWindow::onAlterField()
     // 更新字段
     targetField->name = pair[0];
     targetField->type = pair[1].toUpper() == "INT" ? FieldType::INT :
-                        pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
-                        pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
+                            pair[1].toUpper() == "DOUBLE" ? FieldType::DOUBLE :
+                            pair[1].toUpper() == "BOOLEAN" ? FieldType::BOOLEAN : FieldType::TEXT;
     targetField->length = (targetField->type == FieldType::INT) ? 10 : 255;
 
     if (m_storage->alterTable(m_currentUser, m_currentDb, m_currentTable, fields)) {
@@ -525,8 +530,8 @@ void MainWindow::onInsertRecord()
     for (const Field &f : fields) {
         QLineEdit *edit = new QLineEdit(&dialog);
         edit->setPlaceholderText(f.type == FieldType::INT ? "整数" :
-                                 f.type == FieldType::DOUBLE ? "小数" :
-                                 f.type == FieldType::BOOLEAN ? "true/false" : "文本");
+                                     f.type == FieldType::DOUBLE ? "小数" :
+                                     f.type == FieldType::BOOLEAN ? "true/false" : "文本");
         layout->addRow(f.name + ":", edit);
         inputs[f.name] = edit;
     }
@@ -596,10 +601,14 @@ void MainWindow::onTreeItemClicked(QTreeWidgetItem *item, int column)
         m_currentTable.clear();
         log("当前数据库: " + m_currentDb);
         m_parser->setCurrentDatabase(m_currentDb);
+        // 同步当前数据库到查询引擎
+        m_queryEngine->setCurrentDatabase(m_currentDb);
     } else if (type == "table") {
         m_currentDb = item->parent()->text(0);
         m_currentTable = item->text(0);
         m_parser->setCurrentDatabase(m_currentDb);
+        // 同步当前数据库到查询引擎
+        m_queryEngine->setCurrentDatabase(m_currentDb);
         log("当前表: " + m_currentDb + "." + m_currentTable);
         showSchemaTable(m_currentUser, m_currentDb, m_currentTable);
         showDataTable(m_currentUser, m_currentDb, m_currentTable);
@@ -672,9 +681,9 @@ void MainWindow::showSchemaTable(const QString &username, const QString &dbName,
         const Field &f = fields[i];
         ui->tableSchema->setItem(i, 0, new QTableWidgetItem(f.name));
         ui->tableSchema->setItem(i, 1, new QTableWidgetItem(
-            f.type == FieldType::INT ? "INT" :
-            f.type == FieldType::DOUBLE ? "DOUBLE" :
-            f.type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT"));
+                                           f.type == FieldType::INT ? "INT" :
+                                               f.type == FieldType::DOUBLE ? "DOUBLE" :
+                                               f.type == FieldType::BOOLEAN ? "BOOLEAN" : "TEXT"));
         ui->tableSchema->setItem(i, 2, new QTableWidgetItem(QString::number(f.length)));
         ui->tableSchema->setItem(i, 3, new QTableWidgetItem(f.isNotNull ? "是" : "否"));
         ui->tableSchema->setItem(i, 4, new QTableWidgetItem(f.isPrimaryKey ? "是" : "否"));
@@ -696,7 +705,7 @@ void MainWindow::onDropDatabase()
     }
 
     int ret = QMessageBox::question(this, "确认删除",
-        QString("确定要删除数据库 \"%1\" 吗？此操作将删除所有表和数据，不可恢复！").arg(dbName));
+                                    QString("确定要删除数据库 \"%1\" 吗？此操作将删除所有表和数据，不可恢复！").arg(dbName));
     if (ret != QMessageBox::Yes) return;
 
     if (m_storage->dropDatabase(m_currentUser, dbName)) {
@@ -763,7 +772,7 @@ void MainWindow::onContextMenuAction()
         onCreateTable();
     } else if (actionType == "drop_database") {
         int ret = QMessageBox::question(this, "确认删除",
-            QString("确定要删除数据库 \"%1\" 吗？此操作将删除所有表和数据，不可恢复！").arg(name));
+                                        QString("确定要删除数据库 \"%1\" 吗？此操作将删除所有表和数据，不可恢复！").arg(name));
         if (ret == QMessageBox::Yes) {
             if (m_storage->dropDatabase(m_currentUser, name)) {
                 log(QString("[Storage] 数据库 \"%1\" 删除成功").arg(name));
@@ -782,7 +791,7 @@ void MainWindow::onContextMenuAction()
         }
     } else if (actionType == "drop_table") {
         int ret = QMessageBox::question(this, "确认删除",
-            QString("确定要删除表 \"%1\" 吗？此操作不可恢复！").arg(name));
+                                        QString("确定要删除表 \"%1\" 吗？此操作不可恢复！").arg(name));
         if (ret == QMessageBox::Yes) {
             Response r = m_schema->dropTable(m_currentUser, m_currentDb, name);
             log(r.message);
@@ -825,7 +834,7 @@ void MainWindow::onSearch()
 
     TableSchema schema = sr.data.value<TableSchema>();
     QString searchField = "name"; // 默认搜索字段
-    
+
     // 优先选择第一个TEXT类型的字段
     for (const Field &f : schema.fields) {
         if (f.type == FieldType::TEXT) {

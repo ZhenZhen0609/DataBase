@@ -10,6 +10,7 @@
 #include "recordmanager.h"
 #include "storagemanager.h"
 #include "sqlparser.h"
+#include "queryengine.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -69,6 +70,7 @@ private:
     RecordManager *m_record;
     StorageManager *m_storage;
     SQLParser     *m_parser;
+    QueryEngine *m_queryEngine;
 
     QString m_currentUser;
     QString m_currentDb;

@@ -26,6 +26,7 @@ void runTransactionTests();
 void runLockManagerTests();
 void runMonitorTests();
 void runBackupTests();
+void runDMLTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
 static const bool RUN_TESTS_ONLY = true;
@@ -35,6 +36,7 @@ int main(int argc, char *argv[])
     // 如果只需要运行测试（调试各模块）
     if (RUN_TESTS_ONLY) {
         QCoreApplication a(argc, argv);
+        qRegisterMetaType<TableSchema>();
         // 运行各模块测试
         runAuthTests();
         runSchemaTests();
@@ -47,6 +49,7 @@ int main(int argc, char *argv[])
         runLockManagerTests();
         runMonitorTests();
         runBackupTests();
+        runDMLTests();
 
         return 0; // 测试完成直接退出
     }
@@ -1112,4 +1115,101 @@ void runBackupTests()
     qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
     qDebug() << "║  阶段五 🔴红圈A - 数据备份与恢复测试完成                        ║";
     qDebug() << "╚════════════════════════════════════════════════════════════════╝\n";
+}
+
+void runDMLTests() {
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🟠橙圈B - DML & 查询引擎测试                           ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    StorageManager storage;
+    SQLParser parser;
+    QueryEngine engine;
+
+    parser.setStorageManager(&storage);
+    parser.setQueryEngine(&engine);
+    parser.setCurrentUser("admin");
+
+    // 环境准备
+    parser.parseSQL("CREATE DATABASE DMLTestDB;");
+    parser.setCurrentDatabase("DMLTestDB");
+    parser.parseSQL("CREATE TABLE students (id INT, name TEXT, age INT, score DOUBLE);");
+    engine.setCurrentUser("admin");
+    engine.setCurrentDatabase("DMLTestDB");
+
+    qDebug() << "\n[1] 批量插入3行数据";
+    Response r1 = parser.parseSQL(
+        "INSERT INTO students VALUES (1, 'Alice', 20, 88.5), (2, 'Bob', 22, 76.0), (3, 'Charlie', 19, 92.0);");
+    qDebug() << r1.message;
+
+    qDebug() << "\n[2] 单行插入";
+    Response r2 = parser.parseSQL(
+        "INSERT INTO students (id, name, age, score) VALUES (4, 'Diana', 21, 85.5);");
+    qDebug() << r2.message;
+
+    qDebug() << "\n[3] SELECT * FROM students";
+    Response r3 = parser.parseSQL("SELECT * FROM students;");
+    QJsonArray all = r3.data.toJsonArray();
+    for (auto v : all) {
+        QJsonObject obj = v.toObject();
+        qDebug() << "  " << obj["id"].toInt() << obj["name"].toString()
+                 << obj["age"].toInt() << obj["score"].toDouble();
+    }
+
+    qDebug() << "\n[4] WHERE 条件 age=22";
+    Response r4 = parser.parseSQL("SELECT * FROM students WHERE age = 22;");
+    QJsonArray res4 = r4.data.toJsonArray();
+    qDebug() << "匹配记录数:" << res4.size();
+
+    qDebug() << "\n[5] LIKE 模糊匹配 'A%'";
+    Response r5 = parser.parseSQL("SELECT * FROM students WHERE name LIKE 'A%';");
+    QJsonArray res5 = r5.data.toJsonArray();
+    qDebug() << "匹配记录数:" << res5.size();
+
+    qDebug() << "\n[6] UPDATE 修改";
+    Response r6 = parser.parseSQL("UPDATE students SET score = 95.0 WHERE name = 'Alice';");
+    qDebug() << r6.message;
+
+    qDebug() << "\n[7] 验证更新";
+    Response r7 = parser.parseSQL("SELECT * FROM students WHERE name = 'Alice';");
+    QJsonArray res7 = r7.data.toJsonArray();
+    if (!res7.isEmpty())
+        qDebug() << "Alice的新分数:" << res7.first().toObject()["score"].toDouble();
+
+    qDebug() << "\n[8] 聚合查询: COUNT, AVG, MAX";
+    Response r8 = parser.parseSQL("SELECT COUNT(*), AVG(score), MAX(age) FROM students;");
+    QJsonArray res8 = r8.data.toJsonArray();
+    if (!res8.isEmpty()) {
+        QJsonObject obj = res8.first().toObject();
+        qDebug() << "  COUNT:" << obj["COUNT(*)"].toDouble()
+                 << "  AVG:" << obj["AVG(score)"].toDouble()
+                 << "  MAX:" << obj["MAX(age)"].toDouble();
+    }
+
+    qDebug() << "\n[9] GROUP BY + HAVING";
+    Response r9 = parser.parseSQL(
+        "SELECT age, COUNT(*) AS cnt FROM students GROUP BY age HAVING cnt > 1;");
+    QJsonArray res9 = r9.data.toJsonArray();
+    qDebug() << "分组结果数:" << res9.size();
+
+    qDebug() << "\n[10] ORDER BY + LIMIT OFFSET";
+    Response r10 = parser.parseSQL(
+        "SELECT * FROM students ORDER BY score DESC LIMIT 2 OFFSET 1;");
+    QJsonArray res10 = r10.data.toJsonArray();
+    qDebug() << "返回行数:" << res10.size();
+
+    qDebug() << "\n[11] DELETE 条件删除";
+    Response r11 = parser.parseSQL("DELETE FROM students WHERE age = 21;");
+    qDebug() << r11.message;
+
+    qDebug() << "\n[12] 确认剩余记录";
+    Response r12 = parser.parseSQL("SELECT * FROM students;");
+    QJsonArray res12 = r12.data.toJsonArray();
+    qDebug() << "剩余记录数:" << res12.size();
+
+    // 清理
+    parser.parseSQL("DROP DATABASE DMLTestDB;");
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🟠橙圈B - DML & 查询引擎测试完成                        ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
 }
