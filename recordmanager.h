@@ -20,6 +20,8 @@ public:
     Response selectWithCondition(const QString &username, const QString &dbName, const QString &tableName, const QJsonObject &condition);
     Response selectWithLimitOffset(const QString &username, const QString &dbName, const QString &tableName, int limit, int offset);
 
+    Response replaceAllRecords(const QString &username, const QString &dbName, const QString &tableName, const QJsonArray &records);
+
 private:
     QString getTrdFilePath(const QString &username, const QString &dbName, const QString &tableName) const;
     QString getTdfFilePath(const QString &username, const QString &dbName, const QString &tableName) const;

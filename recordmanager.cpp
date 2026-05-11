@@ -686,3 +686,33 @@ Response RecordManager::selectWithLimitOffset(const QString &username, const QSt
 
     return {ResponseStatus::OK, QString("[Record] Retrieved %1 records (limit=%2, offset=%3)").arg(records.size()).arg(limit).arg(offset), QVariant::fromValue(records)};
 }
+
+Response RecordManager::replaceAllRecords(const QString &username, const QString &dbName, const QString &tableName, const QJsonArray &records)
+{
+    QList<Field> fields = loadTableSchema(username, dbName, tableName);
+    if (fields.isEmpty())
+        return {ResponseStatus::TABLE_NOT_FOUND, "[Record] Table schema not found", QVariant()};
+
+    QString trdPath = getTrdFilePath(username, dbName, tableName);
+    QFile file(trdPath);
+
+    // 获取写锁
+    lockManager.acquireWriteLock(username, dbName, tableName);
+
+    if (!file.open(QIODevice::WriteOnly)) {
+        lockManager.releaseWriteLock(username, dbName, tableName);
+        return {ResponseStatus::ERROR, QString("[Record] Failed to open '%1' for writing").arg(tableName), QVariant()};
+    }
+
+    for (const QJsonValue &val : records) {
+        QJsonObject record = val.toObject();
+        QByteArray recordData = serializeRecord(record, fields);
+        qint64 recordSize = recordData.size();
+        file.write(reinterpret_cast<const char*>(&recordSize), sizeof(qint64));
+        file.write(recordData);
+    }
+    file.close();
+    lockManager.releaseWriteLock(username, dbName, tableName);
+
+    return {ResponseStatus::OK, QString("[Record] Replaced %1 records in '%2'").arg(records.size()).arg(tableName), QVariant()};
+}
