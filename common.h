@@ -56,4 +56,5 @@ const QString DATA_PATH = "./data/";        // 数据存储根目录
 const QString USER_FILE = "users.json";     // 用户配置文件名
 }
 
+Q_DECLARE_METATYPE(TableSchema)
 #endif // COMMON_H
