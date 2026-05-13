@@ -18,6 +18,10 @@
 #include <QListWidgetItem>
 #include <QRegularExpression>
 #include <QColor>
+#include <QFileDialog>
+#include <QTextStream>
+#include <QHeaderView>
+#include <QStringConverter>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -54,6 +58,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnInsertRecord,  &QPushButton::clicked, this, &MainWindow::onInsertRecord);
     connect(ui->btnRefreshSchema, &QPushButton::clicked, this, &MainWindow::onRefreshSchema);
 
+    // 功能2新增: 高级搜索、导入
+    connect(ui->btnAdvancedSearch, &QPushButton::clicked, this, &MainWindow::onAdvancedSearch);
+    connect(ui->btnImportCSV, &QPushButton::clicked, this, &MainWindow::onImportCSV);
+    connect(ui->btnImportJSON, &QPushButton::clicked, this, &MainWindow::onImportJSON);
+    connect(ui->tableData->horizontalHeader(), &QHeaderView::sectionClicked, this, &MainWindow::onTableHeaderClicked);
+
     // SQL执行按钮
     connect(ui->btnExecuteSQL, &QPushButton::clicked, this, &MainWindow::onExecuteSQL);
 
@@ -69,7 +79,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->dbTree, &QTreeWidget::customContextMenuRequested, this, &MainWindow::onTreeItemContextMenu);
 
     // 搜索
-    connect(ui->btnSearch, &QPushButton::clicked, this, &MainWindow::onSearch);
+    // connect(ui->btnSearch, &QPushButton::clicked, this, &MainWindow::onSearch);
 
     // 菜单动作
     connect(ui->actionCreateDb,    &QAction::triggered, this, &MainWindow::onCreateDatabase);
@@ -1016,4 +1026,239 @@ QString MainWindow::formatElapsedTime(qint64 ns)
     } else {
         return QString("%1 s").arg(ns / 1000000000.0, 0, 'f', 3);
     }
+}
+
+void MainWindow::onAdvancedSearch()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    QString whereClause = ui->inputSearch->text().trimmed();
+    if (whereClause.isEmpty()) {
+        showDataTable(m_currentUser, m_currentDb, m_currentTable);
+        return;
+    }
+
+    QString sql = QString("SELECT * FROM %1 WHERE %2").arg(m_currentTable).arg(whereClause);
+
+    if (m_sortColumn >= 0) {
+        QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+        if (m_sortColumn < fields.size()) {
+            QString sortField = fields[m_sortColumn].name;
+            sql += QString(" ORDER BY %1 %2").arg(sortField).arg(m_sortOrder == Qt::AscendingOrder ? "ASC" : "DESC");
+        }
+    }
+
+    Response res = m_parser->parseSQL(sql);
+    log("[高级搜索] " + res.message);
+
+    ui->tableData->clearContents();
+    ui->tableData->setRowCount(0);
+
+    if (res.status != ResponseStatus::OK || !res.data.canConvert<QJsonArray>()) return;
+
+    QJsonArray records = res.data.value<QJsonArray>();
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+
+    QStringList cols;
+    for (const Field &f : fields) cols << f.name;
+
+    ui->tableData->setColumnCount(cols.size());
+    ui->tableData->setHorizontalHeaderLabels(cols);
+    ui->tableData->setRowCount(records.size());
+
+    for (int row = 0; row < records.size(); ++row) {
+        QJsonObject obj = records[row].toObject();
+        for (int col = 0; col < cols.size(); ++col) {
+            QJsonValue val = obj.value(cols[col]);
+            QString text;
+            if (val.isBool())        text = val.toBool() ? "true" : "false";
+            else if (val.isDouble()) text = QString::number(val.toDouble());
+            else                     text = val.toString();
+            ui->tableData->setItem(row, col, new QTableWidgetItem(text));
+        }
+    }
+}
+
+void MainWindow::onTableHeaderClicked(int column)
+{
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) return;
+
+    if (m_sortColumn == column) {
+        m_sortOrder = (m_sortOrder == Qt::AscendingOrder) ? Qt::DescendingOrder : Qt::AscendingOrder;
+    } else {
+        m_sortColumn = column;
+        m_sortOrder = Qt::AscendingOrder;
+    }
+
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (column >= fields.size()) return;
+
+    QString sortField = fields[column].name;
+    QString sql = QString("SELECT * FROM %1 ORDER BY %2 %3")
+                      .arg(m_currentTable)
+                      .arg(sortField)
+                      .arg(m_sortOrder == Qt::AscendingOrder ? "ASC" : "DESC");
+
+    QString whereClause = ui->inputSearch->text().trimmed();
+    if (!whereClause.isEmpty()) {
+        sql = QString("SELECT * FROM %1 WHERE %2 ORDER BY %3 %4")
+                  .arg(m_currentTable)
+                  .arg(whereClause)
+                  .arg(sortField)
+                  .arg(m_sortOrder == Qt::AscendingOrder ? "ASC" : "DESC");
+    }
+
+    Response res = m_parser->parseSQL(sql);
+    log(QString("[排序] 按 %1 %2").arg(sortField).arg(m_sortOrder == Qt::AscendingOrder ? "升序" : "降序"));
+
+    ui->tableData->clearContents();
+    ui->tableData->setRowCount(0);
+
+    if (res.status != ResponseStatus::OK || !res.data.canConvert<QJsonArray>()) return;
+
+    QJsonArray records = res.data.value<QJsonArray>();
+
+    QStringList cols;
+    for (const Field &f : fields) cols << f.name;
+
+    ui->tableData->setColumnCount(cols.size());
+    ui->tableData->setHorizontalHeaderLabels(cols);
+    ui->tableData->setRowCount(records.size());
+
+    for (int row = 0; row < records.size(); ++row) {
+        QJsonObject obj = records[row].toObject();
+        for (int col = 0; col < cols.size(); ++col) {
+            QJsonValue val = obj.value(cols[col]);
+            QString text;
+            if (val.isBool())        text = val.toBool() ? "true" : "false";
+            else if (val.isDouble()) text = QString::number(val.toDouble());
+            else                     text = val.toString();
+            ui->tableData->setItem(row, col, new QTableWidgetItem(text));
+        }
+    }
+}
+
+void MainWindow::onImportCSV()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    QString fileName = QFileDialog::getOpenFileName(this, "导入CSV", "", "CSV文件 (*.csv)");
+    if (fileName.isEmpty()) return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        log("[导入CSV] 无法打开文件");
+        return;
+    }
+
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (fields.isEmpty()) {
+        log("[导入CSV] 无法加载表结构");
+        return;
+    }
+
+    QTextStream in(&file);
+    in.setEncoding(QStringConverter::Utf8);
+
+    QStringList headers;
+    if (!in.atEnd()) {
+        QString headerLine = in.readLine();
+        headers = headerLine.split(',', Qt::SkipEmptyParts);
+        for (QString &h : headers) h = h.trimmed();
+    }
+
+    int count = 0;
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        QStringList values = line.split(',', Qt::KeepEmptyParts);
+
+        QJsonObject record;
+        for (int i = 0; i < headers.size() && i < values.size(); ++i) {
+            QString val = values[i].trimmed();
+            val.remove('"');
+
+            if (i < fields.size()) {
+                switch (fields[i].type) {
+                    case FieldType::INT:
+                        record[headers[i]] = val.toInt();
+                        break;
+                    case FieldType::DOUBLE:
+                        record[headers[i]] = val.toDouble();
+                        break;
+                    case FieldType::BOOLEAN:
+                        record[headers[i]] = (val.toLower() == "true" || val == "1");
+                        break;
+                    default:
+                        record[headers[i]] = val;
+                        break;
+                }
+            } else {
+                record[headers[i]] = val;
+            }
+        }
+
+        Response res = m_record->insertRecord(m_currentUser, m_currentDb, m_currentTable, record);
+        if (res.status == ResponseStatus::OK) {
+            count++;
+        } else {
+            log(QString("[导入CSV] 行 %1 失败: %2").arg(count + 1).arg(res.message));
+        }
+    }
+
+    file.close();
+    log(QString("[导入CSV] 成功导入 %1 条记录").arg(count));
+    showDataTable(m_currentUser, m_currentDb, m_currentTable);
+}
+
+void MainWindow::onImportJSON()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    QString fileName = QFileDialog::getOpenFileName(this, "导入JSON", "", "JSON文件 (*.json)");
+    if (fileName.isEmpty()) return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly)) {
+        log("[导入JSON] 无法打开文件");
+        return;
+    }
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isArray()) {
+        log("[导入JSON] JSON格式错误，需要数组格式");
+        return;
+    }
+
+    QJsonArray records = doc.array();
+    int count = 0;
+
+    for (const QJsonValue &val : records) {
+        if (!val.isObject()) continue;
+
+        QJsonObject record = val.toObject();
+        Response res = m_record->insertRecord(m_currentUser, m_currentDb, m_currentTable, record);
+        if (res.status == ResponseStatus::OK) {
+            count++;
+        } else {
+            log(QString("[导入JSON] 记录 %1 失败: %2").arg(count + 1).arg(res.message));
+        }
+    }
+
+    log(QString("[导入JSON] 成功导入 %1 条记录").arg(count));
+    showDataTable(m_currentUser, m_currentDb, m_currentTable);
 }

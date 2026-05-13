@@ -61,6 +61,12 @@ private slots:
     void onPrevPage();
     void onNextPage();
 
+    // 功能2新增: 高级搜索、排序、批量导入
+    void onAdvancedSearch();
+    void onTableHeaderClicked(int column);
+    void onImportCSV();
+    void onImportJSON();
+
     void onTreeItemClicked(QTreeWidgetItem *item, int column);
     void onTreeItemContextMenu(const QPoint &pos);
     void onContextMenuAction();
@@ -88,6 +94,10 @@ private:
     int m_currentPage = 0;
     int m_pageSize = 50;
     int m_totalRows = 0;
+
+    // 功能2新增: 排序状态
+    int m_sortColumn = -1;
+    Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
 
     QElapsedTimer m_queryTimer;
 
