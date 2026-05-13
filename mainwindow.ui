@@ -709,9 +709,72 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="btnExecuteSQL">
-               <property name="text">
-                <string>🚀 执行SQL</string>
+              <widget class="QWidget" name="sqlExecToolbar" native="true">
+               <layout class="QHBoxLayout" name="sqlExecToolbarLayout">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+                <item>
+                 <widget class="QPushButton" name="btnExecuteSQL">
+                  <property name="text">
+                   <string>🚀 执行SQL</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="labelQueryTime">
+                  <property name="text">
+                   <string>查询用时: --</string>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">color: #f38ba8; font-weight: bold;</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="sqlExecSpacer">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btnPrevPage">
+                  <property name="text">
+                   <string>◀ 上一页</string>
+                  </property>
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="labelPagination">
+                  <property name="text">
+                   <string>第 0/0 页</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btnNextPage">
+                  <property name="text">
+                   <string>下一页 ▶</string>
+                  </property>
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QTableWidget" name="tableSQLResult">
+               <property name="alternatingRowColors">
+                <bool>true</bool>
+               </property>
+               <property name="selectionBehavior">
+                <enum>QAbstractItemView::SelectRows</enum>
                </property>
               </widget>
              </item>

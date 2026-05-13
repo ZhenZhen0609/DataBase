@@ -16,6 +16,8 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QRegularExpression>
+#include <QColor>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -54,6 +56,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     // SQL执行按钮
     connect(ui->btnExecuteSQL, &QPushButton::clicked, this, &MainWindow::onExecuteSQL);
+
+    // 分页按钮
+    connect(ui->btnPrevPage, &QPushButton::clicked, this, &MainWindow::onPrevPage);
+    connect(ui->btnNextPage, &QPushButton::clicked, this, &MainWindow::onNextPage);
+
+    // SQL语法高亮器
+    m_sqlHighlighter = new SqlHighlighter(ui->sqlInput->document());
 
     // 树节点
     connect(ui->dbTree, &QTreeWidget::itemClicked, this, &MainWindow::onTreeItemClicked);
@@ -630,32 +639,66 @@ void MainWindow::onExecuteSQL()
         return;
     }
 
+    ui->dataTableView->setCurrentIndex(2);
+
+    m_queryTimer.start();
     Response res = m_parser->parseSQL(sql);
+    qint64 elapsed = m_queryTimer.nsecsElapsed();
+
+    ui->labelQueryTime->setText("查询用时: " + formatElapsedTime(elapsed));
+
     log(res.message);
 
     if (res.status == ResponseStatus::OK) {
         refreshTree();
+
+        if (res.data.canConvert<QJsonArray>()) {
+            QJsonArray records = res.data.value<QJsonArray>();
+            m_totalRows = records.size();
+
+            int offset = m_currentPage * m_pageSize;
+            int limit = m_pageSize;
+
+            ui->tableSQLResult->clear();
+            ui->tableSQLResult->setRowCount(0);
+
+            if (records.isEmpty()) {
+                updatePaginationLabel();
+                return;
+            }
+
+            QStringList cols;
+            for (const QJsonValue &v : records) {
+                for (const QString &k : v.toObject().keys()) {
+                    if (!cols.contains(k)) cols << k;
+                }
+            }
+
+            ui->tableSQLResult->setColumnCount(cols.size());
+            ui->tableSQLResult->setHorizontalHeaderLabels(cols);
+
+            int displayCount = qMin(limit, m_totalRows - offset);
+            ui->tableSQLResult->setRowCount(displayCount);
+
+            for (int row = 0; row < displayCount; ++row) {
+                QJsonObject obj = records[offset + row].toObject();
+                for (int col = 0; col < cols.size(); ++col) {
+                    QJsonValue val = obj.value(cols[col]);
+                    QString text;
+                    if (val.isBool())        text = val.toBool() ? "true" : "false";
+                    else if (val.isDouble()) text = QString::number(val.toDouble());
+                    else                     text = val.toString();
+                    ui->tableSQLResult->setItem(row, col, new QTableWidgetItem(text));
+                }
+            }
+
+            updatePaginationLabel();
+        }
     }
 }
 
 void MainWindow::showDataTable(const QString &username, const QString &dbName, const QString &tableName)
 {
-    QString trdPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".trd";
-    QFile file(trdPath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        ui->tableData->setRowCount(0);
-        return;
-    }
-
-    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    file.close();
-
-    if (!doc.isArray()) {
-        ui->tableData->setRowCount(0);
-        return;
-    }
-
-    QJsonArray records = doc.array();
     QList<Field> fields = m_storage->loadTableSchema(username, dbName, tableName);
 
     ui->tableData->setColumnCount(fields.size());
@@ -663,6 +706,13 @@ void MainWindow::showDataTable(const QString &username, const QString &dbName, c
     for (const Field &f : fields) headers << f.name;
     ui->tableData->setHorizontalHeaderLabels(headers);
 
+    Response res = m_record->selectAllRecords(username, dbName, tableName);
+    if (res.status != ResponseStatus::OK) {
+        ui->tableData->setRowCount(0);
+        return;
+    }
+
+    QJsonArray records = res.data.value<QJsonArray>();
     ui->tableData->setRowCount(records.size());
     for (int i = 0; i < records.size(); ++i) {
         QJsonObject rec = records[i].toObject();
@@ -876,5 +926,94 @@ void MainWindow::onSearch()
             else                     text = val.toString();
             ui->tableData->setItem(row, col, new QTableWidgetItem(text));
         }
+    }
+}
+
+// SQL语法高亮器实现
+SqlHighlighter::SqlHighlighter(QTextDocument *parent)
+    : QSyntaxHighlighter(parent)
+{
+    keywordFormat.setForeground(QColor("#89b4fa"));
+    keywordFormat.setFontWeight(QFont::Bold);
+
+    stringFormat.setForeground(QColor("#a6e3a1"));
+
+    numberFormat.setForeground(QColor("#f38ba8"));
+}
+
+void SqlHighlighter::highlightBlock(const QString &text)
+{
+    QStringList keywords = {
+        "SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES", "UPDATE", "SET",
+        "DELETE", "CREATE", "DROP", "TABLE", "DATABASE", "ALTER", "ADD", "COLUMN",
+        "PRIMARY", "KEY", "FOREIGN", "REFERENCES", "NOT", "NULL", "UNIQUE",
+        "DEFAULT", "CHECK", "CONSTRAINT", "INDEX", "ON", "ORDER", "BY", "ASC",
+        "DESC", "GROUP", "HAVING", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER",
+        "FULL", "CROSS", "UNION", "ALL", "DISTINCT", "AS", "AND", "OR", "IN",
+        "LIKE", "BETWEEN", "IS", "EXISTS", "CASE", "WHEN", "THEN", "ELSE", "END",
+        "LIMIT", "OFFSET", "INT", "TEXT", "DOUBLE", "BOOLEAN", "VARCHAR", "CHAR",
+        "INTEGER", "FLOAT", "DATE", "TIME", "DATETIME", "TIMESTAMP"
+    };
+
+    for (const QString &keyword : keywords) {
+        QRegularExpression expr("\\b" + keyword + "\\b", QRegularExpression::CaseInsensitiveOption);
+        QRegularExpressionMatchIterator it = expr.globalMatch(text);
+        while (it.hasNext()) {
+            QRegularExpressionMatch match = it.next();
+            setFormat(match.capturedStart(), match.capturedLength(), keywordFormat);
+        }
+    }
+
+    QRegularExpression stringExpr("'[^']*'|\"[^\"]*\"");
+    QRegularExpressionMatchIterator stringIt = stringExpr.globalMatch(text);
+    while (stringIt.hasNext()) {
+        QRegularExpressionMatch match = stringIt.next();
+        setFormat(match.capturedStart(), match.capturedLength(), stringFormat);
+    }
+
+    QRegularExpression numberExpr("\\b\\d+(\\.\\d+)?\\b");
+    QRegularExpressionMatchIterator numberIt = numberExpr.globalMatch(text);
+    while (numberIt.hasNext()) {
+        QRegularExpressionMatch match = numberIt.next();
+        setFormat(match.capturedStart(), match.capturedLength(), numberFormat);
+    }
+}
+
+void MainWindow::onPrevPage()
+{
+    if (m_currentPage > 0) {
+        m_currentPage--;
+        onExecuteSQL();
+    }
+}
+
+void MainWindow::onNextPage()
+{
+    int totalPages = (m_totalRows + m_pageSize - 1) / m_pageSize;
+    if (m_currentPage < totalPages - 1) {
+        m_currentPage++;
+        onExecuteSQL();
+    }
+}
+
+void MainWindow::updatePaginationLabel()
+{
+    int totalPages = (m_totalRows + m_pageSize - 1) / m_pageSize;
+    if (totalPages == 0) totalPages = 1;
+    ui->labelPagination->setText(QString("第 %1/%2 页").arg(m_currentPage + 1).arg(totalPages));
+    ui->btnPrevPage->setEnabled(m_currentPage > 0);
+    ui->btnNextPage->setEnabled(m_currentPage < totalPages - 1);
+}
+
+QString MainWindow::formatElapsedTime(qint64 ns)
+{
+    if (ns < 1000) {
+        return QString("%1 ns").arg(ns);
+    } else if (ns < 1000000) {
+        return QString("%1 μs").arg(ns / 1000.0, 0, 'f', 2);
+    } else if (ns < 1000000000) {
+        return QString("%1 ms").arg(ns / 1000000.0, 0, 'f', 2);
+    } else {
+        return QString("%1 s").arg(ns / 1000000000.0, 0, 'f', 3);
     }
 }
