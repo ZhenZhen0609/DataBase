@@ -3,11 +3,14 @@ C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autog
   C:/Qt/6.9.3/mingw_64/include/QtCore/QDataStream \
   C:/Qt/6.9.3/mingw_64/include/QtCore/QDateTime \
   C:/Qt/6.9.3/mingw_64/include/QtCore/QFile \
+  C:/Qt/6.9.3/mingw_64/include/QtCore/QHash \
   C:/Qt/6.9.3/mingw_64/include/QtCore/QJsonObject \
   C:/Qt/6.9.3/mingw_64/include/QtCore/QList \
   C:/Qt/6.9.3/mingw_64/include/QtCore/QMap \
   C:/Qt/6.9.3/mingw_64/include/QtCore/QObject \
+  C:/Qt/6.9.3/mingw_64/include/QtCore/QReadWriteLock \
   C:/Qt/6.9.3/mingw_64/include/QtCore/QString \
+  C:/Qt/6.9.3/mingw_64/include/QtCore/QStringList \
   C:/Qt/6.9.3/mingw_64/include/QtCore/QVariant \
   C:/Qt/6.9.3/mingw_64/include/QtCore/q17memory.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/q20functional.h \
@@ -48,7 +51,9 @@ C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autog
   C:/Qt/6.9.3/mingw_64/include/QtCore/qdarwinhelpers.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qdatastream.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qdatetime.h \
+  C:/Qt/6.9.3/mingw_64/include/QtCore/qdeadlinetimer.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qdebug.h \
+  C:/Qt/6.9.3/mingw_64/include/QtCore/qelapsedtimer.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qendian.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qexceptionhandling.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qfile.h \
@@ -94,6 +99,7 @@ C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autog
   C:/Qt/6.9.3/mingw_64/include/QtCore/qpair.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qpoint.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qprocessordetection.h \
+  C:/Qt/6.9.3/mingw_64/include/QtCore/qreadwritelock.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qrect.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qrefcount.h \
   C:/Qt/6.9.3/mingw_64/include/QtCore/qregularexpression.h \
@@ -449,6 +455,9 @@ C:/Users/zhenz/Desktop/DBMS/build/Desktop_Qt_6_9_3_MinGW_64_bit-Debug/DBMS_autog
   C:/Qt/Tools/mingw1310_64/x86_64-w64-mingw32/include/wctype.h \
   C:/Users/zhenz/Desktop/DBMS/authmanager.h \
   C:/Users/zhenz/Desktop/DBMS/common.h \
+  C:/Users/zhenz/Desktop/DBMS/conditionparser.h \
+  C:/Users/zhenz/Desktop/DBMS/lockmanager.h \
+  C:/Users/zhenz/Desktop/DBMS/queryengine.h \
   C:/Users/zhenz/Desktop/DBMS/recordmanager.h \
   C:/Users/zhenz/Desktop/DBMS/schemamanager.h \
   C:/Users/zhenz/Desktop/DBMS/sqlparser.h \
