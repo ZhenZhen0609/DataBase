@@ -121,6 +121,13 @@ Response SQLParser::execSelect(const QString &sql) {
     QString tableName = match.captured(2).trimmed();
     QString rest = match.captured(3).trimmed();
 
+    // 处理 DISTINCT 关键字
+    bool distinct = false;
+    if (colsPart.toUpper().startsWith("DISTINCT ")) {
+        distinct = true;
+        colsPart = colsPart.mid(9).trimmed();
+    }
+
     // 解析列名
     QStringList columns;
     if (colsPart != "*") {
@@ -184,9 +191,6 @@ Response SQLParser::execSelect(const QString &sql) {
             offset = limitMatch.captured(2).toInt();
         }
     }
-
-    // DISTINCT
-    bool distinct = sql.toUpper().contains("DISTINCT");
 
     return m_engine->executeSelect(tableName, columns, whereClause, orderBy,
                                    groupBy, having, limit, offset, distinct);
