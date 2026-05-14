@@ -565,6 +565,13 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
              </widget>
             </item>
             <item>
+             <widget class="QPushButton" name="btnShowChart">
+              <property name="text">
+               <string>📊 统计图表</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <spacer name="dataToolbarSpacer">
               <property name="orientation">
                <enum>Qt::Horizontal</enum>

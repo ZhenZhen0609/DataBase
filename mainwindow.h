@@ -67,6 +67,9 @@ private slots:
     void onImportCSV();
     void onImportJSON();
 
+    // 功能4新增: 可视化看板
+    void onShowChart();
+
     void onTreeItemClicked(QTreeWidgetItem *item, int column);
     void onTreeItemContextMenu(const QPoint &pos);
     void onContextMenuAction();

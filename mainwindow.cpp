@@ -64,6 +64,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnImportJSON, &QPushButton::clicked, this, &MainWindow::onImportJSON);
     connect(ui->tableData->horizontalHeader(), &QHeaderView::sectionClicked, this, &MainWindow::onTableHeaderClicked);
 
+    // 功能4新增: 统计图表
+    connect(ui->btnShowChart, &QPushButton::clicked, this, &MainWindow::onShowChart);
+
     // SQL执行按钮
     connect(ui->btnExecuteSQL, &QPushButton::clicked, this, &MainWindow::onExecuteSQL);
 
@@ -93,8 +96,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionAbout,       &QAction::triggered, this, &MainWindow::onAbout);
 
     // 初始化表头
-    ui->tableSchema->setColumnCount(5);
-    ui->tableSchema->setHorizontalHeaderLabels({"字段名", "类型", "长度", "非空", "主键"});
+    ui->tableSchema->setColumnCount(7);
+    ui->tableSchema->setHorizontalHeaderLabels({"字段名", "类型", "长度", "非空", "主键", "约束", "索引"});
 
     // 将StorageManager和QueryEngine注入SQLParser
     m_parser->setStorageManager(m_storage);
@@ -735,7 +738,24 @@ void MainWindow::showDataTable(const QString &username, const QString &dbName, c
 void MainWindow::showSchemaTable(const QString &username, const QString &dbName, const QString &tableName)
 {
     QList<Field> fields = m_storage->loadTableSchema(username, dbName, tableName);
+
+    ui->tableSchema->setColumnCount(7);
+    ui->tableSchema->setHorizontalHeaderLabels({"字段名", "类型", "长度", "非空", "主键", "约束", "索引"});
     ui->tableSchema->setRowCount(fields.size());
+
+    QString tidPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".tid";
+    QFile tidFile(tidPath);
+    QStringList indexedFields;
+    if (tidFile.open(QIODevice::ReadOnly)) {
+        QTextStream in(&tidFile);
+        while (!in.atEnd()) {
+            QString line = in.readLine().trimmed();
+            if (!line.isEmpty()) {
+                indexedFields.append(line);
+            }
+        }
+        tidFile.close();
+    }
 
     for (int i = 0; i < fields.size(); ++i) {
         const Field &f = fields[i];
@@ -747,6 +767,18 @@ void MainWindow::showSchemaTable(const QString &username, const QString &dbName,
         ui->tableSchema->setItem(i, 2, new QTableWidgetItem(QString::number(f.length)));
         ui->tableSchema->setItem(i, 3, new QTableWidgetItem(f.isNotNull ? "是" : "否"));
         ui->tableSchema->setItem(i, 4, new QTableWidgetItem(f.isPrimaryKey ? "是" : "否"));
+
+        QStringList constraints;
+        if (f.isUnique) constraints << "UNIQUE";
+        if (f.hasCheck) constraints << QString("CHECK(%1)").arg(f.checkExpr);
+        if (!f.defaultValue.isEmpty()) constraints << QString("DEFAULT(%1)").arg(f.defaultValue);
+        ui->tableSchema->setItem(i, 5, new QTableWidgetItem(constraints.isEmpty() ? "-" : constraints.join(", ")));
+
+        bool hasIndex = indexedFields.contains(f.name);
+        ui->tableSchema->setItem(i, 6, new QTableWidgetItem(hasIndex ? "✓" : "-"));
+        if (hasIndex) {
+            ui->tableSchema->item(i, 6)->setForeground(QColor("#a6e3a1"));
+        }
     }
 
     ui->dataTableView->setCurrentIndex(1);
@@ -1261,4 +1293,182 @@ void MainWindow::onImportJSON()
 
     log(QString("[导入JSON] 成功导入 %1 条记录").arg(count));
     showDataTable(m_currentUser, m_currentDb, m_currentTable);
+}
+
+void MainWindow::onShowChart()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (fields.isEmpty()) {
+        log("[图表] 无法加载表结构");
+        return;
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("统计图表生成器");
+    dialog.setMinimumWidth(400);
+    QVBoxLayout *layout = new QVBoxLayout(&dialog);
+
+    layout->addWidget(new QLabel("选择分组字段:"));
+    QComboBox *groupCombo = new QComboBox();
+    for (const Field &f : fields) {
+        groupCombo->addItem(f.name);
+    }
+    layout->addWidget(groupCombo);
+
+    layout->addWidget(new QLabel("选择聚合函数:"));
+    QComboBox *aggCombo = new QComboBox();
+    aggCombo->addItem("COUNT(*)");
+    aggCombo->addItem("SUM");
+    aggCombo->addItem("AVG");
+    aggCombo->addItem("MIN");
+    aggCombo->addItem("MAX");
+    layout->addWidget(aggCombo);
+
+    layout->addWidget(new QLabel("选择聚合字段 (SUM/AVG/MIN/MAX时需要):"));
+    QComboBox *aggFieldCombo = new QComboBox();
+    for (const Field &f : fields) {
+        if (f.type == FieldType::INT || f.type == FieldType::DOUBLE) {
+            aggFieldCombo->addItem(f.name);
+        }
+    }
+    layout->addWidget(aggFieldCombo);
+
+    layout->addWidget(new QLabel("可选WHERE条件:"));
+    QLineEdit *whereEdit = new QLineEdit();
+    whereEdit->setPlaceholderText("如: age > 20");
+    layout->addWidget(whereEdit);
+
+    QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    QString groupField = groupCombo->currentText();
+    QString aggFunc = aggCombo->currentText();
+    QString aggField = aggFieldCombo->currentText();
+    QString whereClause = whereEdit->text().trimmed();
+
+    QString sql;
+    if (aggFunc == "COUNT(*)") {
+        sql = QString("SELECT %1, COUNT(*) FROM %2").arg(groupField).arg(m_currentTable);
+    } else {
+        sql = QString("SELECT %1, %2(%3) FROM %4").arg(groupField).arg(aggFunc).arg(aggField).arg(m_currentTable);
+    }
+
+    if (!whereClause.isEmpty()) {
+        sql += QString(" WHERE %1").arg(whereClause);
+    }
+    sql += QString(" GROUP BY %1").arg(groupField);
+
+    Response res = m_parser->parseSQL(sql);
+    log(QString("[图表] 执行: %1").arg(sql));
+    log(res.message);
+
+    if (res.status != ResponseStatus::OK || !res.data.canConvert<QJsonArray>()) {
+        QMessageBox::warning(this, "错误", "查询失败或无数据");
+        return;
+    }
+
+    QJsonArray results = res.data.value<QJsonArray>();
+
+    QDialog resultDialog(this);
+    resultDialog.setWindowTitle(QString("统计结果 - 按 %1 分组").arg(groupField));
+    resultDialog.setMinimumSize(500, 400);
+    QVBoxLayout *resultLayout = new QVBoxLayout(&resultDialog);
+
+    QTableWidget *resultTable = new QTableWidget();
+    resultTable->setColumnCount(2);
+    resultTable->setHorizontalHeaderLabels({groupField, aggFunc});
+    resultTable->setRowCount(results.size());
+
+    double maxVal = 0;
+    for (int i = 0; i < results.size(); ++i) {
+        QJsonObject obj = results[i].toObject();
+        QString key = obj[groupField].toVariant().toString();
+        double val = obj.contains("COUNT(*)") ? obj["COUNT(*)"].toDouble() :
+                     obj.contains(QString("SUM(%1)").arg(aggField)) ? obj[QString("SUM(%1)").arg(aggField)].toDouble() :
+                     obj.contains(QString("AVG(%1)").arg(aggField)) ? obj[QString("AVG(%1)").arg(aggField)].toDouble() :
+                     obj.contains(QString("MIN(%1)").arg(aggField)) ? obj[QString("MIN(%1)").arg(aggField)].toDouble() :
+                     obj.contains(QString("MAX(%1)").arg(aggField)) ? obj[QString("MAX(%1)").arg(aggField)].toDouble() : 0;
+
+        resultTable->setItem(i, 0, new QTableWidgetItem(key));
+        QString valStr;
+        if (obj.contains("COUNT(*)")) {
+            valStr = QString::number((int)val);
+        } else {
+            valStr = QString::number(val, 'f', 2);
+        }
+        resultTable->setItem(i, 1, new QTableWidgetItem(valStr));
+        if (val > maxVal) maxVal = val;
+    }
+    resultLayout->addWidget(resultTable);
+
+    resultLayout->addWidget(new QLabel("简单柱状图:"));
+    QWidget *chartWidget = new QWidget();
+    chartWidget->setMinimumHeight(200);
+    chartWidget->setStyleSheet("background-color: #1e1e2e; border-radius: 6px;");
+    QVBoxLayout *chartLayout = new QVBoxLayout(chartWidget);
+
+    QStringList barColors = {
+        "#89b4fa", "#a6e3a1", "#f38ba8", "#fab387", "#cba6f7",
+        "#89dceb", "#f5e0dc", "#94e2d5", "#f9e2af", "#b4befe"
+    };
+
+    for (int i = 0; i < results.size() && i < 10; ++i) {
+        QJsonObject obj = results[i].toObject();
+        QString key = obj[groupField].toVariant().toString();
+        double val = obj.contains("COUNT(*)") ? obj["COUNT(*)"].toDouble() :
+                     obj.contains(QString("SUM(%1)").arg(aggField)) ? obj[QString("SUM(%1)").arg(aggField)].toDouble() :
+                     obj.contains(QString("AVG(%1)").arg(aggField)) ? obj[QString("AVG(%1)").arg(aggField)].toDouble() :
+                     obj.contains(QString("MIN(%1)").arg(aggField)) ? obj[QString("MIN(%1)").arg(aggField)].toDouble() :
+                     obj.contains(QString("MAX(%1)").arg(aggField)) ? obj[QString("MAX(%1)").arg(aggField)].toDouble() : 0;
+
+        QWidget *barWidget = new QWidget();
+        QHBoxLayout *barLayout = new QHBoxLayout(barWidget);
+        barLayout->setContentsMargins(8, 4, 8, 4);
+
+        QLabel *labelLabel = new QLabel(key);
+        labelLabel->setMinimumWidth(80);
+        labelLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        labelLabel->setStyleSheet("color: #cdd6f4; font-weight: bold;");
+        barLayout->addWidget(labelLabel);
+
+        int barWidth = maxVal > 0 ? (int)(val / maxVal * 300) : 0;
+        QLabel *bar = new QLabel();
+        bar->setMinimumWidth(qMax(barWidth, 5));
+        bar->setMaximumWidth(qMax(barWidth, 5));
+        bar->setMinimumHeight(24);
+        QString barColor = barColors[i % barColors.size()];
+        bar->setStyleSheet(QString("background-color: %1; border-radius: 4px;").arg(barColor));
+        barLayout->addWidget(bar);
+
+        QString valStr;
+        if (obj.contains("COUNT(*)")) {
+            valStr = QString::number((int)val);
+        } else {
+            valStr = QString::number(val, 'f', 2);
+        }
+        QLabel *valueLabel = new QLabel(valStr);
+        valueLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(barColor));
+        barLayout->addWidget(valueLabel);
+        barLayout->addStretch();
+
+        chartLayout->addWidget(barWidget);
+    }
+    chartLayout->addStretch();
+    resultLayout->addWidget(chartWidget);
+
+    QDialogButtonBox *closeBtn = new QDialogButtonBox(QDialogButtonBox::Close);
+    resultLayout->addWidget(closeBtn);
+    connect(closeBtn, &QDialogButtonBox::rejected, &resultDialog, &QDialog::reject);
+
+    resultDialog.exec();
 }

@@ -124,7 +124,16 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
             QJsonObject obj = val.toObject();
             QStringList keyParts;
             for (const QString &gb : groupBy) {
-                keyParts << obj.value(gb).toString();
+                QJsonValue gv = obj.value(gb);
+                if (gv.isDouble()) {
+                    double dv = gv.toDouble();
+                    if (dv == (int)dv)
+                        keyParts << QString::number((int)dv);
+                    else
+                        keyParts << QString::number(dv, 'f', 2);
+                } else {
+                    keyParts << gv.toString();
+                }
             }
             QString key = keyParts.join("|");
             groups[key].append(obj);
