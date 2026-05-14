@@ -4,17 +4,23 @@
 #include <QString>
 #include <QJsonObject>
 #include "common.h"
+#include "lockmanager.h"
 
 class RecordManager
 {
 public:
     RecordManager();
+    ~RecordManager();
 
     Response insertRecord(const QString &username, const QString &dbName, const QString &tableName, const QJsonObject &data);
     Response selectAllRecords(const QString &username, const QString &dbName, const QString &tableName);
     Response updateRecord(const QString &username, const QString &dbName, const QString &tableName, const QString &recordId, const QJsonObject &newData);
     Response deleteRecord(const QString &username, const QString &dbName, const QString &tableName, const QString &recordId);
     Response selectWhere(const QString &username, const QString &dbName, const QString &tableName, const QString &fieldName, const QVariant &value);
+    Response selectWithCondition(const QString &username, const QString &dbName, const QString &tableName, const QJsonObject &condition);
+    Response selectWithLimitOffset(const QString &username, const QString &dbName, const QString &tableName, int limit, int offset);
+
+    Response replaceAllRecords(const QString &username, const QString &dbName, const QString &tableName, const QJsonArray &records);
 
 private:
     QString getTrdFilePath(const QString &username, const QString &dbName, const QString &tableName) const;
@@ -28,6 +34,11 @@ private:
     QJsonObject deserializeRecord(const QByteArray &data, const QList<Field> &fields);
     
     QString getPrimaryKeyField(const QList<Field> &fields) const;
+    
+    /**
+     * @brief 读写锁管理器
+     */
+    LockManager lockManager;
 };
 
 #endif // RECORDMANAGER_H

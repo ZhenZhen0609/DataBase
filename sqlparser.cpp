@@ -1,30 +1,27 @@
 #include "sqlparser.h"
 #include "storagemanager.h"
+#include "queryengine.h"
 #include <QStringList>
 #include <QRegularExpression>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 SQLParser::SQLParser(QObject *parent) : QObject(parent) {}
 
 void SQLParser::setStorageManager(StorageManager *storage) { m_storage = storage; }
 void SQLParser::setCurrentUser(const QString &user) { m_currentUser = user; }
 void SQLParser::setCurrentDatabase(const QString &db) { m_currentDB = db; }
+void SQLParser::setQueryEngine(QueryEngine *engine) { m_engine = engine; }
 
-/*先存一下
-CREATE TABLE students (id INT, name TEXT)
-
-ALTER TABLE students ADD age INT
-ALTER TABLE students ADD gender TEXT
-
-ALTER TABLE students MODIFY age DOUBLE
-
-ALTER TABLE students DROP gender
- */
-
-//解析语句
+// 解析入口，根据语句类型分发
 Response SQLParser::parseSQL(const QString &sql)
 {
     if (!m_storage) {
         return {ResponseStatus::ERROR, "[SQLParser] StorageManager 未设置", QVariant()};
+    }
+    if (!m_engine) {
+        return {ResponseStatus::ERROR, "[SQLParser] QueryEngine 未设置", QVariant()};
     }
 
     // 1. 去除首尾空白及末尾分号
@@ -33,11 +30,26 @@ Response SQLParser::parseSQL(const QString &sql)
         trimmed.chop(1);
     trimmed = trimmed.trimmed();
 
-    // 2. 统一转大写用于识别关键字（名称保留原始大小写）
+    // 2. 统一转大写用于关键字判断
     QString upper = trimmed.toUpper();
     QStringList tokens = trimmed.split(' ', Qt::SkipEmptyParts);
     QStringList upperTokens = upper.split(' ', Qt::SkipEmptyParts);
 
+    // ---------- DML 分支 ----------
+    if (upperTokens[0] == "SELECT") {
+        return execSelect(trimmed);
+    }
+    if (upperTokens[0] == "INSERT") {
+        return execInsert(trimmed);
+    }
+    if (upperTokens[0] == "UPDATE") {
+        return execUpdate(trimmed);
+    }
+    if (upperTokens[0] == "DELETE") {
+        return execDelete(trimmed);
+    }
+
+    // ---------- DDL 分支（原有代码） ----------
     if (tokens.size() < 2)
         return {ResponseStatus::ERROR, "语法错误：指令不完整", QVariant()};
 
@@ -45,7 +57,7 @@ Response SQLParser::parseSQL(const QString &sql)
     if (upperTokens[0] == "CREATE" && upperTokens[1] == "DATABASE") {
         if (tokens.size() < 3)
             return {ResponseStatus::ERROR, "语法错误：缺少数据库名称", QVariant()};
-        QString dbName = tokens[2];   // 原始大小写
+        QString dbName = tokens[2];
         return execCreateDatabase(dbName);
     }
 
@@ -57,7 +69,6 @@ Response SQLParser::parseSQL(const QString &sql)
 
     // 表操作
     if (upperTokens[0] == "CREATE" && upperTokens[1] == "TABLE") {
-        // 使用正则获取表名和括号内容
         QRegularExpression re(R"(CREATE\s+TABLE\s+(\w+)\s*\((.*)\)\s*)",
                               QRegularExpression::CaseInsensitiveOption);
         auto match = re.match(trimmed);
@@ -81,24 +92,222 @@ Response SQLParser::parseSQL(const QString &sql)
     if (upperTokens[0] == "ALTER" && upperTokens[1] == "TABLE") {
         if (tokens.size() < 4)
             return {ResponseStatus::ERROR, "语法错误：ALTER TABLE 格式应为 ALTER TABLE 表名 ADD/DROP/MODIFY 字段名 类型", QVariant()};
-        
+
         QString tableName = tokens[2];
         QString alterType = upperTokens[3]; // ADD/DROP/MODIFY
-        
-        // 获取字段部分（从第4个token开始）
+
         QString fieldStr = trimmed;
         int pos = fieldStr.indexOf(alterType, 0, Qt::CaseInsensitive);
         if (pos != -1) {
             fieldStr = fieldStr.mid(pos + alterType.length()).trimmed();
         }
-        
+
         return execAlterTable(tableName, alterType, fieldStr);
     }
 
     return {ResponseStatus::ERROR, "不支持的SQL指令：" + trimmed, QVariant()};
 }
 
-// 执行函数实现
+// ==================== DML 执行函数 ====================
+
+Response SQLParser::execSelect(const QString &sql) {
+    QRegularExpression re(R"(SELECT\s+(.*?)\s+FROM\s+(\w+)(.*))",
+                          QRegularExpression::CaseInsensitiveOption);
+    auto match = re.match(sql);
+    if (!match.hasMatch())
+        return {ResponseStatus::ERROR, "Invalid SELECT syntax", QVariant()};
+
+    QString colsPart = match.captured(1).trimmed();
+    QString tableName = match.captured(2).trimmed();
+    QString rest = match.captured(3).trimmed();
+
+    // 解析列名
+    QStringList columns;
+    if (colsPart != "*") {
+        QStringList rawCols = colsPart.split(',', Qt::SkipEmptyParts);
+        for (QString c : rawCols) {
+            columns.append(c.trimmed());
+        }
+    } else {
+        columns.append("*");
+    }
+
+    // 提取 WHERE 子句
+    QString whereClause;
+    QRegularExpression whereRe("\\bWHERE\\b\\s+(.+?)(?=\\b(ORDER\\s+BY|GROUP\\s+BY|HAVING|LIMIT)\\b|$)",
+                               QRegularExpression::CaseInsensitiveOption);
+    auto whereMatch = whereRe.match(rest);
+    if (whereMatch.hasMatch()) {
+        whereClause = whereMatch.captured(1).trimmed();
+    }
+
+    // 提取 ORDER BY
+    QString orderBy;
+    QRegularExpression orderRe("\\bORDER\\s+BY\\b\\s+(.+?)(?=\\b(WHERE|GROUP\\s+BY|HAVING|LIMIT)\\b|$)",
+                               QRegularExpression::CaseInsensitiveOption);
+    auto orderMatch = orderRe.match(rest);
+    if (orderMatch.hasMatch()) {
+        orderBy = orderMatch.captured(1).trimmed();
+    }
+
+    // 提取 GROUP BY
+    QStringList groupBy;
+    QRegularExpression groupRe("\\bGROUP\\s+BY\\b\\s+(.+?)(?=\\b(WHERE|ORDER\\s+BY|HAVING|LIMIT)\\b|$)",
+                               QRegularExpression::CaseInsensitiveOption);
+    auto groupMatch = groupRe.match(rest);
+    if (groupMatch.hasMatch()) {
+        QString gb = groupMatch.captured(1).trimmed();
+        QStringList rawGb = gb.split(',', Qt::SkipEmptyParts);
+        for (QString g : rawGb) {
+            groupBy.append(g.trimmed());
+        }
+    }
+
+    // 提取 HAVING
+    QString having;
+    QRegularExpression havingRe("\\bHAVING\\b\\s+(.+?)(?=\\b(WHERE|ORDER\\s+BY|GROUP\\s+BY|LIMIT)\\b|$)",
+                                QRegularExpression::CaseInsensitiveOption);
+    auto havingMatch = havingRe.match(rest);
+    if (havingMatch.hasMatch()) {
+        having = havingMatch.captured(1).trimmed();
+    }
+
+    // 提取 LIMIT / OFFSET
+    int limit = -1;
+    int offset = 0;
+    QRegularExpression limitRe("\\bLIMIT\\b\\s+(\\d+)(?:\\s+OFFSET\\s+(\\d+))?",
+                               QRegularExpression::CaseInsensitiveOption);
+    auto limitMatch = limitRe.match(rest);
+    if (limitMatch.hasMatch()) {
+        limit = limitMatch.captured(1).toInt();
+        if (!limitMatch.captured(2).isEmpty()) {
+            offset = limitMatch.captured(2).toInt();
+        }
+    }
+
+    // DISTINCT
+    bool distinct = sql.toUpper().contains("DISTINCT");
+
+    return m_engine->executeSelect(tableName, columns, whereClause, orderBy,
+                                   groupBy, having, limit, offset, distinct);
+}
+
+Response SQLParser::execInsert(const QString &sql) {
+    QRegularExpression re(R"(INSERT\s+INTO\s+(\w+)\s*(?:\(([^)]*)\))?\s*VALUES\s*(.+))",
+                          QRegularExpression::CaseInsensitiveOption);
+    auto match = re.match(sql);
+    if (!match.hasMatch())
+        return {ResponseStatus::ERROR, "Invalid INSERT syntax", QVariant()};
+
+    QString tableName = match.captured(1);
+    QString colsPart = match.captured(2).trimmed();
+    QString valsPart = match.captured(3).trimmed();
+
+    QStringList colNames;
+    if (!colsPart.isEmpty()) {
+        QStringList rawCols = colsPart.split(',', Qt::SkipEmptyParts);
+        for (QString c : rawCols) {
+            colNames.append(c.trimmed());
+        }
+    }
+
+    // 解析多行值
+    QList<QJsonArray> rows;
+    QRegularExpression valueRe(R"(\(([^)]+)\))");
+    auto it = valueRe.globalMatch(valsPart);
+    while (it.hasNext()) {
+        auto vm = it.next();
+        QStringList vals = vm.captured(1).split(',', Qt::SkipEmptyParts);
+        QJsonArray row;
+        for (const QString &v : vals) {
+            QString trimmed = v.trimmed();
+            bool isDouble;
+            trimmed.toDouble(&isDouble);
+            if (isDouble) {
+                row.append(trimmed.toDouble());
+            } else {
+                // 去掉引号
+                trimmed.remove('\'').remove('\"');
+                row.append(trimmed);
+            }
+        }
+        rows.append(row);
+    }
+
+    if (rows.isEmpty())
+        return {ResponseStatus::ERROR, "No values specified", QVariant()};
+
+    return m_engine->executeInsert(tableName, colNames, rows);
+}
+
+Response SQLParser::execUpdate(const QString &sql) {
+    // 使用 indexOf 定位 SET 和 WHERE
+    int setIdx = sql.indexOf(QRegularExpression("\\bSET\\b", QRegularExpression::CaseInsensitiveOption));
+    if (setIdx == -1) return {ResponseStatus::ERROR, "Invalid UPDATE syntax", QVariant()};
+    int whereIdx = sql.indexOf(QRegularExpression("\\bWHERE\\b", QRegularExpression::CaseInsensitiveOption), setIdx + 3);
+
+    // 提取表名（UPDATE 关键字之后，SET 之前）
+    QString prefix = sql.left(setIdx).trimmed();
+    QStringList parts = prefix.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    if (parts.size() < 2 || parts[0].toUpper() != "UPDATE")
+        return {ResponseStatus::ERROR, "Invalid UPDATE syntax", QVariant()};
+    QString tableName = parts[1];
+
+    QString setPart;
+    QString whereClause;
+    if (whereIdx != -1) {
+        setPart = sql.mid(setIdx + 3, whereIdx - setIdx - 3).trimmed();
+        whereClause = sql.mid(whereIdx + 5).trimmed();
+        if (whereClause.endsWith(';')) whereClause.chop(1);
+    } else {
+        setPart = sql.mid(setIdx + 3).trimmed();
+        if (setPart.endsWith(';')) setPart.chop(1);
+    }
+
+    // 解析 SET 赋值
+    QJsonObject assignments;
+    QStringList setPairs = setPart.split(',', Qt::SkipEmptyParts);
+    for (const QString &pair : setPairs) {
+        int eqIdx = pair.indexOf('=');
+        if (eqIdx == -1) continue;
+        QString key = pair.left(eqIdx).trimmed();
+        QString val = pair.mid(eqIdx + 1).trimmed();
+        bool isDouble;
+        val.toDouble(&isDouble);
+        if (isDouble) {
+            assignments[key] = val.toDouble();
+        } else {
+            val.remove('\'').remove('\"');
+            assignments[key] = val;
+        }
+    }
+
+    return m_engine->executeUpdate(tableName, assignments, whereClause);
+}
+
+Response SQLParser::execDelete(const QString &sql) {
+    // 使用 indexOf 提取 WHERE
+    int whereIdx = sql.indexOf(QRegularExpression("\\bWHERE\\b", QRegularExpression::CaseInsensitiveOption));
+    int fromIdx = sql.indexOf(QRegularExpression("\\bFROM\\b", QRegularExpression::CaseInsensitiveOption));
+    if (fromIdx == -1) return {ResponseStatus::ERROR, "Invalid DELETE syntax", QVariant()};
+
+    // 表名：FROM 之后到下一个空格或 WHERE
+    QString afterFrom = sql.mid(fromIdx + 4).trimmed();
+    QStringList tokens = afterFrom.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    if (tokens.isEmpty()) return {ResponseStatus::ERROR, "Invalid DELETE syntax", QVariant()};
+    QString tableName = tokens.first();
+
+    QString whereClause;
+    if (whereIdx != -1) {
+        whereClause = sql.mid(whereIdx + 5).trimmed();
+        if (whereClause.endsWith(';')) whereClause.chop(1);
+    }
+
+    return m_engine->executeDelete(tableName, whereClause);
+}
+
+// ==================== DDL 执行函数（原有代码） ====================
+
 Response SQLParser::execCreateDatabase(const QString &dbName)
 {
     if (m_currentUser.isEmpty())
@@ -163,19 +372,16 @@ Response SQLParser::execDropTable(const QString &tableName)
     }
 }
 
-//字段解析
 QList<Field> SQLParser::parseFieldDefinitions(const QString &fieldsStr) const
 {
     QList<Field> fields;
-    // 按逗号分割，再按空格分割字段名和类型
     QStringList parts = fieldsStr.split(',', Qt::SkipEmptyParts);
     for (const QString &part : parts) {
         QString trimmed = part.trimmed();
         QStringList pair = trimmed.split(' ', Qt::SkipEmptyParts);
-        if (pair.size() < 2) continue;   // 格式错误，跳过
+        if (pair.size() < 2) continue;
         QString fieldName = pair[0];
         FieldType type = strToFieldType(pair[1].toUpper());
-        // 默认长度为：INT 10, TEXT 255, DOUBLE 0, BOOLEAN 0
         int length = 255;
         if (type == FieldType::INT) length = 10;
         fields.append(Field(fieldName, type, length));
@@ -189,10 +395,9 @@ FieldType SQLParser::strToFieldType(const QString &typeStr) const
     if (typeStr == "TEXT")    return FieldType::TEXT;
     if (typeStr == "DOUBLE")  return FieldType::DOUBLE;
     if (typeStr == "BOOLEAN" || typeStr == "BOOL") return FieldType::BOOLEAN;
-    return FieldType::TEXT;   // 默认当作TEXT
+    return FieldType::TEXT;
 }
 
-// ALTER TABLE 执行函数
 Response SQLParser::execAlterTable(const QString &tableName, const QString &alterType, const QString &fieldStr)
 {
     if (m_currentUser.isEmpty())
@@ -200,13 +405,11 @@ Response SQLParser::execAlterTable(const QString &tableName, const QString &alte
     if (m_currentDB.isEmpty())
         return {ResponseStatus::ERROR, "请先选择或创建一个数据库", QVariant()};
 
-    // 获取现有表结构
     QList<Field> currentFields = m_storage->loadTableSchema(m_currentUser, m_currentDB, tableName);
     if (currentFields.isEmpty()) {
         return {ResponseStatus::TABLE_NOT_FOUND, QString("表 '%1' 不存在").arg(tableName), QVariant()};
     }
 
-    // 解析字段定义
     QList<Field> newFields = parseFieldDefinitions(fieldStr);
     if (newFields.isEmpty() && alterType != "DROP") {
         return {ResponseStatus::ERROR, "字段定义解析失败", QVariant()};
@@ -216,9 +419,7 @@ Response SQLParser::execAlterTable(const QString &tableName, const QString &alte
     bool ok = false;
 
     if (alterType == "ADD") {
-        // 添加字段：合并现有字段和新字段
         for (const Field &newField : newFields) {
-            // 检查字段是否已存在
             bool exists = false;
             for (const Field &f : currentFields) {
                 if (f.name == newField.name) {
@@ -234,33 +435,31 @@ Response SQLParser::execAlterTable(const QString &tableName, const QString &alte
         resultMsg = QString("表 '%1' 添加字段成功").arg(tableName);
     }
     else if (alterType == "DROP") {
-        // 删除字段：从现有字段中移除
         QStringList fieldNamesToRemove;
         QStringList parts = fieldStr.split(' ', Qt::SkipEmptyParts);
         for (const QString &part : parts) {
             fieldNamesToRemove.append(part.trimmed());
         }
-        
+
         QList<Field> remainingFields;
         for (const Field &f : currentFields) {
             if (!fieldNamesToRemove.contains(f.name)) {
                 remainingFields.append(f);
             }
         }
-        
+
         if (remainingFields.isEmpty()) {
             return {ResponseStatus::ERROR, "表至少需要一个字段", QVariant()};
         }
-        
+
         ok = m_storage->alterTable(m_currentUser, m_currentDB, tableName, remainingFields);
         resultMsg = QString("表 '%1' 删除字段成功").arg(tableName);
     }
     else if (alterType == "MODIFY") {
-        // 修改字段：替换现有字段定义
         if (newFields.isEmpty()) {
             return {ResponseStatus::ERROR, "缺少字段定义", QVariant()};
         }
-        
+
         Field fieldToModify = newFields.first();
         for (int i = 0; i < currentFields.size(); i++) {
             if (currentFields[i].name == fieldToModify.name) {
@@ -269,7 +468,7 @@ Response SQLParser::execAlterTable(const QString &tableName, const QString &alte
                 break;
             }
         }
-        
+
         ok = m_storage->alterTable(m_currentUser, m_currentDB, tableName, currentFields);
         resultMsg = QString("表 '%1' 修改字段成功").arg(tableName);
     }

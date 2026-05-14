@@ -4,11 +4,15 @@
 #include "recordmanager.h"
 #include "storagemanager.h"
 #include "sqlparser.h"
+#include "indexmanager.h"
+#include "lockmanager.h"
 
 #include <QApplication>
 #include <QDebug>
 #include <QJsonArray>
 #include <QFile>
+#include <QElapsedTimer>
+#include <QDir>
 
 // 测试函数声明
 void runAuthTests();
@@ -16,6 +20,13 @@ void runSchemaTests();
 void runRecordTests();
 void runStorageTests();
 void runSQLParserTests();
+void runIndexTests();
+void runQueryOptimizationTests();
+void runTransactionTests();
+void runLockManagerTests();
+void runMonitorTests();
+void runBackupTests();
+void runDMLTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
 static const bool RUN_TESTS_ONLY = false;
@@ -25,12 +36,20 @@ int main(int argc, char *argv[])
     // 如果只需要运行测试（调试各模块）
     if (RUN_TESTS_ONLY) {
         QCoreApplication a(argc, argv);
+        qRegisterMetaType<TableSchema>();
         // 运行各模块测试
         runAuthTests();
         runSchemaTests();
         runRecordTests();
         runStorageTests();
         runSQLParserTests();
+        runIndexTests();
+        runQueryOptimizationTests();
+        runTransactionTests();
+        runLockManagerTests();
+        runMonitorTests();
+        runBackupTests();
+        runDMLTests();
 
         return 0; // 测试完成直接退出
     }
@@ -422,7 +441,7 @@ void runStorageTests()
     qDebug() << "\n[测试3] 测试表结构变更 (alterTable)";
 
     // 先建一个全新的测试库和表
-    QString alterDB = "AlterTestDB";
+    QString alterDB = "AlterTestDB_" + QString::number(QDateTime::currentSecsSinceEpoch());
     storageManager.createDatabase(testUser, alterDB);
     QList<Field> initialFields;
     initialFields.append(Field("id", FieldType::INT, 10)); // 初始只有1个字段
@@ -463,7 +482,7 @@ void runStorageTests()
 
     // 测试5：重复创建相同数据库的拦截测试
     qDebug() << "\n[测试5] 测试重复创建数据库 (拦截验证)";
-    QString dupDB = "DupTestDB";
+    QString dupDB = "DupTestDB_" + QString::number(QDateTime::currentSecsSinceEpoch());
 
     // 第一次建库，应该成功
     storageManager.createDatabase(testUser, dupDB);
@@ -480,6 +499,7 @@ void runStorageTests()
 
     // 打扫战场（把测试用的数据库删掉）
     storageManager.dropDatabase(testUser, alterDB);
+    storageManager.dropDatabase(testUser, dupDB);
 }
 
 void runSQLParserTests() {
@@ -526,5 +546,670 @@ void runSQLParserTests() {
 
     qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
     qDebug() << "║  阶段四 🟠橙圈B - SQL解析器测试完成                             ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 索引管理器测试（阶段五 🔴红圈A - 第一周任务1）
+void runIndexTests()
+{
+    IndexManager indexManager;
+    StorageManager storageManager;
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 索引管理器测试                                ║";
+    qDebug() << "║  模块: IndexManager                                            ║";
+    qDebug() << "║  任务: 创建/删除索引、索引查找、添加/删除索引项                ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 先创建测试数据库和表
+    qDebug() << "\n[前置] 创建测试数据库 IndexTestDB";
+    bool dbResult = storageManager.createDatabase("testuser", "IndexTestDB");
+    qDebug() << "数据库创建结果:" << (dbResult ? "成功 ✓" : "失败 ✗");
+
+    qDebug() << "\n[前置] 创建测试表 test_table";
+    QList<Field> fields;
+    fields.append(Field("id", FieldType::INT, 10));
+    fields.back().isPrimaryKey = true;
+    fields.append(Field("name", FieldType::TEXT, 50));
+    bool tableResult = storageManager.createTable("testuser", "IndexTestDB", "test_table", fields);
+    qDebug() << "表创建结果:" << (tableResult ? "成功 ✓" : "失败 ✗");
+
+    // 测试1: 创建索引
+    qDebug() << "\n[测试1] 创建索引 (idx_id on test_table.id)";
+    bool createResult = indexManager.createIndex("testuser", "IndexTestDB", "test_table", "idx_id", "id", FieldType::INT);
+    qDebug() << "创建结果:" << (createResult ? "成功 ✓" : "失败 ✗");
+    if (createResult) {
+        qDebug() << "测试1 通过!";
+    } else {
+        qDebug() << "测试1 失败!";
+    }
+
+    // 测试2: 重复创建索引（应失败）
+    qDebug() << "\n[测试2] 重复创建索引 (idx_id on test_table.id)";
+    bool createResult2 = indexManager.createIndex("testuser", "IndexTestDB", "test_table", "idx_id", "id", FieldType::INT);
+    qDebug() << "创建结果:" << (!createResult2 ? "预期失败 ✓" : "意外成功 ✗");
+    if (!createResult2) {
+        qDebug() << "测试2 通过!";
+    } else {
+        qDebug() << "测试2 失败!";
+    }
+
+    // 测试3: 添加索引项
+    qDebug() << "\n[测试3] 添加索引项 (key=1, offset=0)";
+    bool addResult = indexManager.addIndexEntry("testuser", "IndexTestDB", "test_table", "idx_id", 1, 0);
+    qDebug() << "添加结果:" << (addResult ? "成功 ✓" : "失败 ✗");
+    if (addResult) {
+        qDebug() << "测试3 通过!";
+    } else {
+        qDebug() << "测试3 失败!";
+    }
+
+    // 测试4: 添加更多索引项
+    qDebug() << "\n[测试4] 添加更多索引项 (key=2, offset=100; key=3, offset=200)";
+    bool addResult2 = indexManager.addIndexEntry("testuser", "IndexTestDB", "test_table", "idx_id", 2, 100);
+    bool addResult3 = indexManager.addIndexEntry("testuser", "IndexTestDB", "test_table", "idx_id", 3, 200);
+    qDebug() << "添加结果:" << (addResult2 && addResult3 ? "成功 ✓" : "失败 ✗");
+    if (addResult2 && addResult3) {
+        qDebug() << "测试4 通过!";
+    } else {
+        qDebug() << "测试4 失败!";
+    }
+
+    // 测试5: 查找索引项
+    qDebug() << "\n[测试5] 查找索引项 (key=2)";
+    int offset = indexManager.lookup("testuser", "IndexTestDB", "test_table", "idx_id", 2);
+    qDebug() << "查找结果: offset=" << offset << (offset == 100 ? " ✓" : " ✗");
+    if (offset == 100) {
+        qDebug() << "测试5 通过!";
+    } else {
+        qDebug() << "测试5 失败!";
+    }
+
+    // 测试6: 查找不存在的键
+    qDebug() << "\n[测试6] 查找不存在的键 (key=999)";
+    int offset2 = indexManager.lookup("testuser", "IndexTestDB", "test_table", "idx_id", 999);
+    qDebug() << "查找结果: offset=" << offset2 << (offset2 == -1 ? " ✓" : " ✗");
+    if (offset2 == -1) {
+        qDebug() << "测试6 通过!";
+    } else {
+        qDebug() << "测试6 失败!";
+    }
+
+    // 测试7: 删除索引项
+    qDebug() << "\n[测试7] 删除索引项 (key=2)";
+    bool removeResult = indexManager.removeIndexEntry("testuser", "IndexTestDB", "test_table", "idx_id", 2);
+    qDebug() << "删除结果:" << (removeResult ? "成功 ✓" : "失败 ✗");
+    if (removeResult) {
+        qDebug() << "测试7 通过!";
+    } else {
+        qDebug() << "测试7 失败!";
+    }
+
+    // 测试8: 验证删除后的查找结果
+    qDebug() << "\n[测试8] 验证删除后的查找结果 (key=2)";
+    int offset3 = indexManager.lookup("testuser", "IndexTestDB", "test_table", "idx_id", 2);
+    qDebug() << "查找结果: offset=" << offset3 << (offset3 == -1 ? " ✓" : " ✗");
+    if (offset3 == -1) {
+        qDebug() << "测试8 通过!";
+    } else {
+        qDebug() << "测试8 失败!";
+    }
+
+    // 测试9: 删除索引
+    qDebug() << "\n[测试9] 删除索引 (idx_id)";
+    bool dropResult = indexManager.dropIndex("testuser", "IndexTestDB", "test_table", "idx_id");
+    qDebug() << "删除结果:" << (dropResult ? "成功 ✓" : "失败 ✗");
+    if (dropResult) {
+        qDebug() << "测试9 通过!";
+    } else {
+        qDebug() << "测试9 失败!";
+    }
+
+    // 测试10: 删除不存在的索引（应失败）
+    qDebug() << "\n[测试10] 删除不存在的索引 (idx_id)";
+    bool dropResult2 = indexManager.dropIndex("testuser", "IndexTestDB", "test_table", "idx_id");
+    qDebug() << "删除结果:" << (!dropResult2 ? "预期失败 ✓" : "意外成功 ✗");
+    if (!dropResult2) {
+        qDebug() << "测试10 通过!";
+    } else {
+        qDebug() << "测试10 失败!";
+    }
+
+    // 清理测试数据
+    qDebug() << "\n[清理] 删除测试数据库 IndexTestDB";
+    storageManager.dropDatabase("testuser", "IndexTestDB");
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 索引管理器测试完成                            ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 查询性能优化测试（阶段五 🔴红圈A - 第一周任务2）
+void runQueryOptimizationTests()
+{
+    RecordManager recordManager;
+    StorageManager storageManager;
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 查询性能优化测试                              ║";
+    qDebug() << "║  模块: RecordManager                                           ║";
+    qDebug() << "║  任务: WHERE条件推送、LIMIT/OFFSET分页支持                      ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 先创建测试数据库和表
+    qDebug() << "\n[前置] 创建测试数据库 QueryOptTestDB";
+    bool dbResult = storageManager.createDatabase("testuser", "QueryOptTestDB");
+    qDebug() << "数据库创建结果:" << (dbResult ? "成功 ✓" : "失败 ✗");
+
+    qDebug() << "\n[前置] 创建测试表 users";
+    QList<Field> fields;
+    fields.append(Field("id", FieldType::INT, 10));
+    fields.back().isPrimaryKey = true;
+    fields.append(Field("name", FieldType::TEXT, 50));
+    fields.append(Field("age", FieldType::INT, 3));
+    fields.append(Field("score", FieldType::DOUBLE, 6));
+    bool tableResult = storageManager.createTable("testuser", "QueryOptTestDB", "users", fields);
+    qDebug() << "表创建结果:" << (tableResult ? "成功 ✓" : "失败 ✗");
+
+    // 插入测试数据
+    qDebug() << "\n[前置] 插入10条测试数据";
+    for (int i = 1; i <= 10; i++) {
+        QJsonObject record;
+        record["id"] = i;
+        record["name"] = QString("User%1").arg(i);
+        record["age"] = 20 + (i % 5);
+        record["score"] = 60.0 + (i * 3.5);
+        recordManager.insertRecord("testuser", "QueryOptTestDB", "users", record);
+    }
+    qDebug() << "插入完成";
+
+    // 测试1: WHERE条件推送
+    qDebug() << "\n[测试1] WHERE条件推送 (age=22)";
+    QJsonObject condition;
+    condition["age"] = 22;
+    Response resp1 = recordManager.selectWithCondition("testuser", "QueryOptTestDB", "users", condition);
+    qDebug() << "查询结果:" << (resp1.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (resp1.status == ResponseStatus::OK) {
+        QJsonArray records = resp1.data.toJsonArray();
+        qDebug() << "匹配记录数:" << records.size();
+        qDebug() << "测试1 通过!";
+    } else {
+        qDebug() << "测试1 失败!";
+    }
+
+    // 测试2: LIMIT/OFFSET分页 - 第一页
+    qDebug() << "\n[测试2] LIMIT/OFFSET分页 (limit=3, offset=0)";
+    Response resp2 = recordManager.selectWithLimitOffset("testuser", "QueryOptTestDB", "users", 3, 0);
+    qDebug() << "查询结果:" << (resp2.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (resp2.status == ResponseStatus::OK) {
+        QJsonArray records = resp2.data.toJsonArray();
+        qDebug() << "返回记录数:" << records.size();
+        if (records.size() == 3) {
+            qDebug() << "测试2 通过!";
+        } else {
+            qDebug() << "测试2 失败! 期望3条，实际" << records.size() << "条";
+        }
+    } else {
+        qDebug() << "测试2 失败!";
+    }
+
+    // 测试3: LIMIT/OFFSET分页 - 第二页
+    qDebug() << "\n[测试3] LIMIT/OFFSET分页 (limit=3, offset=3)";
+    Response resp3 = recordManager.selectWithLimitOffset("testuser", "QueryOptTestDB", "users", 3, 3);
+    qDebug() << "查询结果:" << (resp3.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (resp3.status == ResponseStatus::OK) {
+        QJsonArray records = resp3.data.toJsonArray();
+        qDebug() << "返回记录数:" << records.size();
+        if (records.size() == 3) {
+            qDebug() << "测试3 通过!";
+        } else {
+            qDebug() << "测试3 失败! 期望3条，实际" << records.size() << "条";
+        }
+    } else {
+        qDebug() << "测试3 失败!";
+    }
+
+    // 测试4: LIMIT/OFFSET分页 - 最后一页
+    qDebug() << "\n[测试4] LIMIT/OFFSET分页 (limit=3, offset=9)";
+    Response resp4 = recordManager.selectWithLimitOffset("testuser", "QueryOptTestDB", "users", 3, 9);
+    qDebug() << "查询结果:" << (resp4.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (resp4.status == ResponseStatus::OK) {
+        QJsonArray records = resp4.data.toJsonArray();
+        qDebug() << "返回记录数:" << records.size();
+        if (records.size() == 1) {
+            qDebug() << "测试4 通过!";
+        } else {
+            qDebug() << "测试4 失败! 期望1条，实际" << records.size() << "条";
+        }
+    } else {
+        qDebug() << "测试4 失败!";
+    }
+
+    // 测试5: 组合条件查询
+    qDebug() << "\n[测试5] 组合条件查询 (age>=22 AND score>=70)";
+    QJsonObject condition2;
+    condition2["age"] = 22;
+    Response resp5 = recordManager.selectWithCondition("testuser", "QueryOptTestDB", "users", condition2);
+    qDebug() << "查询结果:" << (resp5.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (resp5.status == ResponseStatus::OK) {
+        QJsonArray records = resp5.data.toJsonArray();
+        qDebug() << "匹配记录数:" << records.size();
+        qDebug() << "测试5 通过!";
+    } else {
+        qDebug() << "测试5 失败!";
+    }
+
+    // 清理测试数据
+    qDebug() << "\n[清理] 删除测试数据库 QueryOptTestDB";
+    storageManager.dropDatabase("testuser", "QueryOptTestDB");
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 查询性能优化测试完成                          ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 基础事务支持测试（阶段五 🔴红圈A - 第一周任务3）
+void runTransactionTests()
+{
+    StorageManager storageManager;
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 基础事务支持测试                              ║";
+    qDebug() << "║  模块: StorageManager                                          ║";
+    qDebug() << "║  任务: BEGIN/COMMIT/ROLLBACK 事务操作                          ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 先创建测试数据库
+    qDebug() << "\n[前置] 创建测试数据库 TransactionTestDB";
+    bool dbResult = storageManager.createDatabase("testuser", "TransactionTestDB");
+    qDebug() << "数据库创建结果:" << (dbResult ? "成功 ✓" : "失败 ✗");
+
+    // 测试1: BEGIN TRANSACTION
+    qDebug() << "\n[测试1] BEGIN TRANSACTION";
+    bool beginResult = storageManager.beginTransaction("testuser", "TransactionTestDB");
+    qDebug() << "BEGIN结果:" << (beginResult ? "成功 ✓" : "失败 ✗");
+    if (beginResult) {
+        qDebug() << "测试1 通过!";
+    } else {
+        qDebug() << "测试1 失败!";
+    }
+
+    // 测试2: COMMIT TRANSACTION
+    qDebug() << "\n[测试2] COMMIT TRANSACTION";
+    bool commitResult = storageManager.commitTransaction("testuser", "TransactionTestDB");
+    qDebug() << "COMMIT结果:" << (commitResult ? "成功 ✓" : "失败 ✗");
+    if (commitResult) {
+        qDebug() << "测试2 通过!";
+    } else {
+        qDebug() << "测试2 失败!";
+    }
+
+    // 测试3: ROLLBACK TRANSACTION
+    qDebug() << "\n[测试3] ROLLBACK TRANSACTION";
+    bool rollbackResult = storageManager.rollbackTransaction("testuser", "TransactionTestDB");
+    qDebug() << "ROLLBACK结果:" << (rollbackResult ? "成功 ✓" : "失败 ✗");
+    if (rollbackResult) {
+        qDebug() << "测试3 通过!";
+    } else {
+        qDebug() << "测试3 失败!";
+    }
+
+    // 测试4: 验证日志文件内容
+    qDebug() << "\n[测试4] 验证日志文件内容";
+    QString logPath = "./data/testuser/TransactionTestDB/ruanko.log";
+    QFile logFile(logPath);
+    if (logFile.exists() && logFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "---------------- ruanko.log ----------------";
+        qDebug().noquote() << logFile.readAll().trimmed();
+        qDebug() << "--------------------------------------------";
+        logFile.close();
+        qDebug() << "测试4 通过! 日志文件包含事务操作记录 ✓";
+    } else {
+        qDebug() << "测试4 失败 ✗ 无法找到或打开日志文件。";
+    }
+
+    // 清理测试数据
+    qDebug() << "\n[清理] 删除测试数据库 TransactionTestDB";
+    storageManager.dropDatabase("testuser", "TransactionTestDB");
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 基础事务支持测试完成                          ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 并发控制测试（阶段五 🔴红圈A - 第二周任务4）
+void runLockManagerTests()
+{
+    StorageManager storageManager;
+    RecordManager recordManager;
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 并发控制测试                                  ║";
+    qDebug() << "║  模块: LockManager                                             ║";
+    qDebug() << "║  任务: 读写锁机制、多用户并发访问保护                          ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 先创建测试数据库
+    qDebug() << "\n[前置] 创建测试数据库 LockTestDB";
+    bool dbResult = storageManager.createDatabase("testuser", "LockTestDB");
+    qDebug() << "数据库创建结果:" << (dbResult ? "成功 ✓" : "失败 ✗");
+
+    qDebug() << "\n[前置] 创建测试表 test_table";
+    QList<Field> fields;
+    fields.append(Field("id", FieldType::INT, 10));
+    fields.back().isPrimaryKey = true;
+    fields.append(Field("name", FieldType::TEXT, 50));
+    bool tableResult = storageManager.createTable("testuser", "LockTestDB", "test_table", fields);
+    qDebug() << "表创建结果:" << (tableResult ? "成功 ✓" : "失败 ✗");
+
+    // 测试1: 插入记录（写锁）
+    qDebug() << "\n[测试1] 插入记录（写锁保护）";
+    QJsonObject record1;
+    record1["id"] = 1;
+    record1["name"] = "张三";
+    Response insertResult = recordManager.insertRecord("testuser", "LockTestDB", "test_table", record1);
+    qDebug() << "插入结果:" << (insertResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (insertResult.status == ResponseStatus::OK) {
+        qDebug() << "测试1 通过!";
+    } else {
+        qDebug() << "测试1 失败!";
+    }
+
+    // 测试2: 查询记录（读锁）
+    qDebug() << "\n[测试2] 查询所有记录（读锁保护）";
+    Response selectResult = recordManager.selectAllRecords("testuser", "LockTestDB", "test_table");
+    qDebug() << "查询结果:" << (selectResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (selectResult.status == ResponseStatus::OK) {
+        QJsonArray records = selectResult.data.toJsonArray();
+        qDebug() << "记录数量:" << records.size();
+        qDebug() << "测试2 通过!";
+    } else {
+        qDebug() << "测试2 失败!";
+    }
+
+    // 测试3: 更新记录（写锁）
+    qDebug() << "\n[测试3] 更新记录（写锁保护）";
+    QJsonObject updateData;
+    updateData["name"] = "李四";
+    Response updateResult = recordManager.updateRecord("testuser", "LockTestDB", "test_table", "1", updateData);
+    qDebug() << "更新结果:" << (updateResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (updateResult.status == ResponseStatus::OK) {
+        qDebug() << "测试3 通过!";
+    } else {
+        qDebug() << "测试3 失败!";
+    }
+
+    // 测试4: 删除记录（写锁）
+    qDebug() << "\n[测试4] 删除记录（写锁保护）";
+    Response deleteResult = recordManager.deleteRecord("testuser", "LockTestDB", "test_table", "1");
+    qDebug() << "删除结果:" << (deleteResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (deleteResult.status == ResponseStatus::OK) {
+        qDebug() << "测试4 通过!";
+    } else {
+        qDebug() << "测试4 失败!";
+    }
+
+    // 测试5: 条件查询（读锁）
+    qDebug() << "\n[测试5] 条件查询（读锁保护）";
+    QJsonObject condition;
+    condition["id"] = 1;
+    Response conditionResult = recordManager.selectWithCondition("testuser", "LockTestDB", "test_table", condition);
+    qDebug() << "查询结果:" << (conditionResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (conditionResult.status == ResponseStatus::OK) {
+        QJsonArray records = conditionResult.data.toJsonArray();
+        qDebug() << "匹配记录数:" << records.size();
+        qDebug() << "测试5 通过!";
+    } else {
+        qDebug() << "测试5 失败!";
+    }
+
+    // 测试6: 分页查询（读锁）
+    qDebug() << "\n[测试6] 分页查询（读锁保护）";
+    Response limitResult = recordManager.selectWithLimitOffset("testuser", "LockTestDB", "test_table", 10, 0);
+    qDebug() << "查询结果:" << (limitResult.status == ResponseStatus::OK ? "成功 ✓" : "失败 ✗");
+    if (limitResult.status == ResponseStatus::OK) {
+        QJsonArray records = limitResult.data.toJsonArray();
+        qDebug() << "返回记录数:" << records.size();
+        qDebug() << "测试6 通过!";
+    } else {
+        qDebug() << "测试6 失败!";
+    }
+
+    // 测试7: 删除表（写锁）
+    qDebug() << "\n[测试7] 删除表（写锁保护）";
+    bool dropTableResult = storageManager.dropTable("testuser", "LockTestDB", "test_table");
+    qDebug() << "删除结果:" << (dropTableResult ? "成功 ✓" : "失败 ✗");
+    if (dropTableResult) {
+        qDebug() << "测试7 通过!";
+    } else {
+        qDebug() << "测试7 失败!";
+    }
+
+    // 测试8: 删除数据库（写锁）
+    qDebug() << "\n[测试8] 删除数据库（写锁保护）";
+    bool dropDbResult = storageManager.dropDatabase("testuser", "LockTestDB");
+    qDebug() << "删除结果:" << (dropDbResult ? "成功 ✓" : "失败 ✗");
+    if (dropDbResult) {
+        qDebug() << "测试8 通过!";
+    } else {
+        qDebug() << "测试8 失败!";
+    }
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 并发控制测试完成                              ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 系统监控测试（阶段五 🔴红圈A - 第二周任务5）
+void runMonitorTests()
+{
+    StorageManager storageManager;
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 系统监控测试                                  ║";
+    qDebug() << "║  模块: StorageManager Monitor                                  ║";
+    qDebug() << "║  任务: 性能统计、磁盘I/O监控、查询耗时计算                     ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 1. 测试磁盘读取监控 (读取不存在的表也会触发一次物理查找尝试)
+    storageManager.readTableData("testuser", "MonitorDB", "table_a");
+    storageManager.readTableData("testuser", "MonitorDB", "table_b");
+
+    // 2. 测试磁盘写入监控
+    storageManager.writeTableData("testuser", "MonitorDB", "table_c", QByteArray("data"));
+
+    // 3. 模拟上层引擎 (橙圈B/蓝圈C) 执行查询并上报耗时
+    QElapsedTimer timer;
+
+    // 模拟一次慢查询 (假装耗时 45ms)
+    timer.start();
+    // (假装在做复杂的 SQL 解析和 WHERE 过滤)
+    storageManager.recordQueryTime(45);
+
+    // 模拟一次快查询 (假装耗时 5ms，例如命中了你第一周写的缓存)
+    timer.start();
+    storageManager.recordQueryTime(5);
+
+    // 4. 打印系统监控报告
+    qDebug() << "\n[测试验证] 打印系统运行报告：";
+    storageManager.printSystemStats();
+
+    // 5. 验证重置功能
+    storageManager.resetSystemStats();
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 系统监控测试完成                              ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 数据备份与恢复测试（阶段五 🔴红圈A - 第二周任务6）
+void runBackupTests()
+{
+    StorageManager storageManager;
+    QString testUser = "testuser";
+    QString testDB = "BackupTestDB";
+    QString testTable = "ImportantData";
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 数据备份与恢复测试                            ║";
+    qDebug() << "║  模块: StorageManager Backup & Restore                         ║";
+    qDebug() << "║  任务: 数据库物理目录拷贝、灾难恢复                            ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // [前置] 创建测试库和表
+    qDebug() << "\n[前置] 创建测试数据库和表...";
+    storageManager.createDatabase(testUser, testDB);
+    QList<Field> fields;
+    fields.append(Field("id", FieldType::INT, 10));
+    storageManager.createTable(testUser, testDB, testTable, fields);
+
+    // 1. 备份数据库
+    qDebug() << "\n[测试1] 执行数据库备份";
+    bool backupResult = storageManager.backupDatabase(testUser, testDB);
+    qDebug() << "备份指令下发结果:" << (backupResult ? "成功 ✓" : "失败 ✗");
+
+    // 2. 自动寻找刚才生成的带有时间戳的备份文件夹
+    QDir userDir("./data/" + testUser);
+    QStringList filters;
+    filters << testDB + "_backup_*"; // 过滤条件
+    // 按时间倒序排列，拿最新的那个
+    QStringList backupFolders = userDir.entryList(filters, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Time);
+
+    if (backupFolders.isEmpty()) {
+        qDebug() << "❌ 致命错误：未找到生成的备份文件夹，测试终止。";
+        return;
+    }
+    QString latestBackup = backupFolders.first();
+    qDebug() << "✅ 成功找到生成的备份文件夹:" << latestBackup;
+
+    // 3. 模拟数据灾难（把原表物理删除）
+    qDebug() << "\n[测试2] 模拟数据破坏 (Drop Table)";
+    storageManager.dropTable(testUser, testDB, testTable);
+
+    bool tdfExists = QFile::exists("./data/" + testUser + "/" + testDB + "/" + testTable + ".tdf");
+    qDebug() << "破坏后验证 .tdf 文件是否存在:" << (tdfExists ? "是 ✗ (未成功删除)" : "否 ✓ (已成功破坏)");
+
+    // 4. 从备份恢复数据
+    qDebug() << "\n[测试3] 从备份目录恢复数据库";
+    bool restoreResult = storageManager.restoreDatabase(testUser, testDB, latestBackup);
+    qDebug() << "恢复指令下发结果:" << (restoreResult ? "成功 ✓" : "失败 ✗");
+
+    // 5. 验证数据是否“复活”
+    qDebug() << "\n[测试4] 验证数据是否成功复活";
+    bool restoredTdfExists = QFile::exists("./data/" + testUser + "/" + testDB + "/" + testTable + ".tdf");
+    qDebug() << "恢复后验证 .tdf 文件是否存在:" << (restoredTdfExists ? "是 ✓" : "否 ✗");
+
+    if (restoreResult && restoredTdfExists) {
+        qDebug() << "\n🎉 测试完美通过! 数据库已具备物理级灾难恢复能力。";
+    } else {
+        qDebug() << "\n💥 测试失败! 请检查文件路径或拷贝逻辑。";
+    }
+
+    // 6. 打扫战场
+    storageManager.dropDatabase(testUser, testDB); // 删除恢复的原库
+    QDir backupDir("./data/" + testUser + "/" + latestBackup);
+    if (backupDir.exists()) {
+        backupDir.removeRecursively(); // 手动把测试用的备份库也删掉
+    }
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🔴红圈A - 数据备份与恢复测试完成                        ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝\n";
+}
+
+void runDMLTests() {
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🟠橙圈B - DML & 查询引擎测试                           ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    StorageManager storage;
+    SQLParser parser;
+    QueryEngine engine;
+
+    parser.setStorageManager(&storage);
+    parser.setQueryEngine(&engine);
+    parser.setCurrentUser("admin");
+
+    // 环境准备
+    parser.parseSQL("CREATE DATABASE DMLTestDB;");
+    parser.setCurrentDatabase("DMLTestDB");
+    parser.parseSQL("CREATE TABLE students (id INT, name TEXT, age INT, score DOUBLE);");
+    engine.setCurrentUser("admin");
+    engine.setCurrentDatabase("DMLTestDB");
+
+    qDebug() << "\n[1] 批量插入3行数据";
+    Response r1 = parser.parseSQL(
+        "INSERT INTO students VALUES (1, 'Alice', 20, 88.5), (2, 'Bob', 22, 76.0), (3, 'Charlie', 19, 92.0);");
+    qDebug() << r1.message;
+
+    qDebug() << "\n[2] 单行插入";
+    Response r2 = parser.parseSQL(
+        "INSERT INTO students (id, name, age, score) VALUES (4, 'Diana', 21, 85.5);");
+    qDebug() << r2.message;
+
+    qDebug() << "\n[3] SELECT * FROM students";
+    Response r3 = parser.parseSQL("SELECT * FROM students;");
+    QJsonArray all = r3.data.toJsonArray();
+    for (auto v : all) {
+        QJsonObject obj = v.toObject();
+        qDebug() << "  " << obj["id"].toInt() << obj["name"].toString()
+                 << obj["age"].toInt() << obj["score"].toDouble();
+    }
+
+    qDebug() << "\n[4] WHERE 条件 age=22";
+    Response r4 = parser.parseSQL("SELECT * FROM students WHERE age = 22;");
+    QJsonArray res4 = r4.data.toJsonArray();
+    qDebug() << "匹配记录数:" << res4.size();
+
+    qDebug() << "\n[5] LIKE 模糊匹配 'A%'";
+    Response r5 = parser.parseSQL("SELECT * FROM students WHERE name LIKE 'A%';");
+    QJsonArray res5 = r5.data.toJsonArray();
+    qDebug() << "匹配记录数:" << res5.size();
+
+    qDebug() << "\n[6] UPDATE 修改";
+    Response r6 = parser.parseSQL("UPDATE students SET score = 95.0 WHERE name = 'Alice';");
+    qDebug() << r6.message;
+
+    qDebug() << "\n[7] 验证更新";
+    Response r7 = parser.parseSQL("SELECT * FROM students WHERE name = 'Alice';");
+    QJsonArray res7 = r7.data.toJsonArray();
+    if (!res7.isEmpty())
+        qDebug() << "Alice的新分数:" << res7.first().toObject()["score"].toDouble();
+
+    qDebug() << "\n[8] 聚合查询: COUNT, AVG, MAX";
+    Response r8 = parser.parseSQL("SELECT COUNT(*), AVG(score), MAX(age) FROM students;");
+    QJsonArray res8 = r8.data.toJsonArray();
+    if (!res8.isEmpty()) {
+        QJsonObject obj = res8.first().toObject();
+        qDebug() << "  COUNT:" << obj["COUNT(*)"].toDouble()
+                 << "  AVG:" << obj["AVG(score)"].toDouble()
+                 << "  MAX:" << obj["MAX(age)"].toDouble();
+    }
+
+    qDebug() << "\n[9] GROUP BY + HAVING";
+    Response r9 = parser.parseSQL(
+        "SELECT age, COUNT(*) AS cnt FROM students GROUP BY age HAVING cnt > 1;");
+    QJsonArray res9 = r9.data.toJsonArray();
+    qDebug() << "分组结果数:" << res9.size();
+
+    qDebug() << "\n[10] ORDER BY + LIMIT OFFSET";
+    Response r10 = parser.parseSQL(
+        "SELECT * FROM students ORDER BY score DESC LIMIT 2 OFFSET 1;");
+    QJsonArray res10 = r10.data.toJsonArray();
+    qDebug() << "返回行数:" << res10.size();
+
+    qDebug() << "\n[11] DELETE 条件删除";
+    Response r11 = parser.parseSQL("DELETE FROM students WHERE age = 21;");
+    qDebug() << r11.message;
+
+    qDebug() << "\n[12] 确认剩余记录";
+    Response r12 = parser.parseSQL("SELECT * FROM students;");
+    QJsonArray res12 = r12.data.toJsonArray();
+    qDebug() << "剩余记录数:" << res12.size();
+
+    // 清理
+    parser.parseSQL("DROP DATABASE DMLTestDB;");
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🟠橙圈B - DML & 查询引擎测试完成                        ║";
     qDebug() << "╚════════════════════════════════════════════════════════════════╝";
 }

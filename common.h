@@ -22,10 +22,16 @@ struct Field {
     int length;        // 长度限制（可选）
     bool isNotNull;    // 是否必填
     bool isPrimaryKey; // 是否为主键
+    bool isUnique;     // 是否唯一约束
+    bool hasCheck;     // 是否有CHECK约束
+    QString checkExpr; // CHECK约束表达式
+    QString defaultValue; // 默认值
+    bool hasIndex;     // 是否有索引
 
     // 构造函数，方便初始化
     Field(QString n="", FieldType t=FieldType::TEXT, int l=255)
-        : name(n), type(t), length(l), isNotNull(false), isPrimaryKey(false) {}
+        : name(n), type(t), length(l), isNotNull(false), isPrimaryKey(false),
+          isUnique(false), hasCheck(false), hasIndex(false) {}
 };
 
 //表结构定义
@@ -52,8 +58,9 @@ struct Response {
 
 //全局常量
 namespace Config {
-const QString DATA_PATH = "./data/";        // 数据存储根目录
+const QString DATA_PATH = "../data/";        // 数据存储根目录
 const QString USER_FILE = "users.json";     // 用户配置文件名
 }
 
+Q_DECLARE_METATYPE(TableSchema)
 #endif // COMMON_H

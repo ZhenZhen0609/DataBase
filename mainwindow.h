@@ -5,15 +5,32 @@
 #include <QTreeWidgetItem>
 #include <QMenu>
 #include <QAction>
+#include <QElapsedTimer>
+#include <QSyntaxHighlighter>
+#include <QTextCharFormat>
 #include "authmanager.h"
 #include "schemamanager.h"
 #include "recordmanager.h"
 #include "storagemanager.h"
 #include "sqlparser.h"
+#include "queryengine.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+
+// SQL语法高亮器
+class SqlHighlighter : public QSyntaxHighlighter {
+    Q_OBJECT
+public:
+    explicit SqlHighlighter(QTextDocument *parent);
+protected:
+    void highlightBlock(const QString &text) override;
+private:
+    QTextCharFormat keywordFormat;
+    QTextCharFormat stringFormat;
+    QTextCharFormat numberFormat;
+};
 
 class MainWindow : public QMainWindow
 {
@@ -24,41 +41,38 @@ public:
     ~MainWindow();
 
 private slots:
-    // 认证
     void onLogin();
     void onRegister();
-
-    // 数据库
     void onCreateDatabase();
     void onDropDatabase();
-
-    // 表管理
     void onCreateTable();
     void onDropTable();
     void onAlterTable();
-
-    // 数据操作
     void onRefreshData();
     void onInsertRecord();
     void onRefreshSchema();
     void onSearch();
-
-    // 字段操作
     void onAddField();
     void onDropField();
     void onAlterField();
-
-    // SQL解析
     void onExecuteSQL();
 
-    // 树节点选中
+    // 功能1新增: 分页
+    void onPrevPage();
+    void onNextPage();
+
+    // 功能2新增: 高级搜索、排序、批量导入
+    void onAdvancedSearch();
+    void onTableHeaderClicked(int column);
+    void onImportCSV();
+    void onImportJSON();
+
+    // 功能4新增: 可视化看板
+    void onShowChart();
+
     void onTreeItemClicked(QTreeWidgetItem *item, int column);
     void onTreeItemContextMenu(const QPoint &pos);
-
-    // 右键菜单操作
     void onContextMenuAction();
-
-    // 菜单
     void onAbout();
 
 private:
@@ -69,6 +83,8 @@ private:
     RecordManager *m_record;
     StorageManager *m_storage;
     SQLParser     *m_parser;
+    QueryEngine   *m_queryEngine;
+    SqlHighlighter *m_sqlHighlighter;
 
     QString m_currentUser;
     QString m_currentDb;
@@ -77,11 +93,24 @@ private:
 
     QTreeWidgetItem *m_contextMenuTarget;
 
+    // 功能1新增: 分页状态
+    int m_currentPage = 0;
+    int m_pageSize = 50;
+    int m_totalRows = 0;
+
+    // 功能2新增: 排序状态
+    int m_sortColumn = -1;
+    Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
+
+    QElapsedTimer m_queryTimer;
+
     void log(const QString &msg);
     void refreshTree();
     void showDataTable(const QString &username, const QString &dbName, const QString &tableName);
     void showSchemaTable(const QString &username, const QString &dbName, const QString &tableName);
     void requireLogin();
+    void updatePaginationLabel();
+    QString formatElapsedTime(qint64 ns);
 };
 
 #endif // MAINWINDOW_H

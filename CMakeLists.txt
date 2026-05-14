@@ -29,12 +29,10 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         schemamanager.h schemamanager.cpp
         recordmanager.h recordmanager.cpp
         sqlparser.h sqlparser.cpp
-
-
-
-
-
-
+        indexmanager.h indexmanager.cpp
+        lockmanager.h lockmanager.cpp
+        queryengine.h queryengine.cpp
+        conditionparser.h conditionparser.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET DBMS APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
