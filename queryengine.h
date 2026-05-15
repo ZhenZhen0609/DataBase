@@ -29,6 +29,18 @@ public:
                            const QString &whereClause);
     Response executeDelete(const QString &tableName, const QString &whereClause);
 
+    // 扩展功能：JOIN, UNION, VIEW
+    Response executeJoinSelect(const QString &sql);
+    Response executeUnion(const QString &leftSql, const QString &rightSql, bool distinct);
+    Response executeCreateView(const QString &viewName, const QString &selectSql);
+    Response executeDropView(const QString &viewName);
+
+    // 合并两个结果集（供 UNION 使用）
+    Response mergeUnion(const QJsonArray &leftRows, const QJsonArray &rightRows, bool distinct);
+
+    // 视图展开辅助（递归展开，最大深度5）
+    QString expandView(const QString &viewName, int depth = 0);
+
 private:
     QString m_currentUser;
     QString m_currentDb;
