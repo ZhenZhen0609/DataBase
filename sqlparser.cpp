@@ -24,16 +24,60 @@ Response SQLParser::parseSQL(const QString &sql)
         return {ResponseStatus::ERROR, "[SQLParser] QueryEngine 未设置", QVariant()};
     }
 
-    // 1. 去除首尾空白及末尾分号
+    QString input = sql.trimmed();
+    
+    // 检查是否有多条SQL语句（用分号分隔）
+    if (input.contains(';')) {
+        QStringList statements = input.split(';', Qt::SkipEmptyParts);
+        QList<QString> stmtList;
+        for (QString s : statements) { s = s.trimmed(); if (!s.isEmpty()) stmtList.append(s); }
+
+        if (stmtList.size() == 1) {
+            return parseSingleStatement(stmtList[0]);
+        }
+
+        QString resultMessage;
+        int successCount = 0;
+        int errorCount = 0;
+        QVariant lastData;
+
+        for (const QString &stmt : stmtList) {
+            Response resp = parseSingleStatement(stmt);
+            if (resp.status == ResponseStatus::OK) {
+                successCount++;
+                resultMessage += QString("语句 %1: %2\n").arg(successCount + errorCount).arg(resp.message);
+                if (resp.data.isValid() && !resp.data.isNull())
+                    lastData = resp.data;
+            } else {
+                errorCount++;
+                resultMessage += QString("语句 %1: 错误 - %2\n").arg(successCount + errorCount).arg(resp.message);
+            }
+        }
+        
+        if (errorCount == 0) {
+            return {ResponseStatus::OK, QString("成功执行 %1 条语句\n%2").arg(successCount).arg(resultMessage), lastData};
+        } else {
+            return {ResponseStatus::ERROR, QString("执行完成：成功 %1 条，失败 %2 条\n%3").arg(successCount).arg(errorCount).arg(resultMessage), QVariant()};
+        }
+    }
+    
+    // 处理单条语句
+    return parseSingleStatement(input);
+}
+
+Response SQLParser::parseSingleStatement(const QString &sql)
+{
+    // 1. 去除首尾空白
     QString trimmed = sql.trimmed();
-    if (trimmed.endsWith(';'))
-        trimmed.chop(1);
-    trimmed = trimmed.trimmed();
 
     // 2. 统一转大写用于关键字判断
     QString upper = trimmed.toUpper();
     QStringList tokens = trimmed.split(' ', Qt::SkipEmptyParts);
     QStringList upperTokens = upper.split(' ', Qt::SkipEmptyParts);
+
+    if (tokens.isEmpty()) {
+        return {ResponseStatus::ERROR, "语法错误：空语句", QVariant()};
+    }
 
     // ---------- DML 分支 ----------
     if (upperTokens[0] == "SELECT") {
@@ -69,16 +113,34 @@ Response SQLParser::parseSQL(const QString &sql)
 
     // 表操作
     if (upperTokens[0] == "CREATE" && upperTokens[1] == "TABLE") {
-        QRegularExpression re(R"(CREATE\s+TABLE\s+(\w+)\s*\((.*)\)\s*)",
-                              QRegularExpression::CaseInsensitiveOption);
-        auto match = re.match(trimmed);
-        if (!match.hasMatch()) {
+        // 先将多行SQL压缩成单行，再精确计数配对外括号
+        QString compact = trimmed;
+        compact.replace(QRegularExpression(R"(\s+)"), " ");
+        int parenStart = compact.indexOf('(');
+        if (parenStart == -1) {
             return {ResponseStatus::ERROR,
                     "语法错误：CREATE TABLE 格式应为 CREATE TABLE 表名 (字段名 类型, ...)",
                     QVariant()};
         }
-        QString tableName = match.captured(1);
-        QString fieldsStr = match.captured(2).trimmed();
+        int braceCount = 0;
+        int parenEnd = -1;
+        for (int j = parenStart; j < compact.length(); ++j) {
+            if (compact[j] == '(') braceCount++;
+            else if (compact[j] == ')') {
+                braceCount--;
+                if (braceCount == 0) {
+                    parenEnd = j;
+                    break;
+                }
+            }
+        }
+        if (parenEnd == -1) {
+            return {ResponseStatus::ERROR,
+                    "语法错误：括号不匹配",
+                    QVariant()};
+        }
+        QString tableName = tokens[2];
+        QString fieldsStr = compact.mid(parenStart + 1, parenEnd - parenStart - 1).trimmed();
         return execCreateTable(tableName, fieldsStr);
     }
 
@@ -245,6 +307,11 @@ Response SQLParser::execInsert(const QString &sql) {
 }
 
 Response SQLParser::execUpdate(const QString &sql) {
+    if (m_currentUser.isEmpty())
+        return {ResponseStatus::AUTH_FAILED, "请先登录", QVariant()};
+    if (m_currentDB.isEmpty())
+        return {ResponseStatus::ERROR, "请先选择或创建一个数据库", QVariant()};
+
     // 使用 indexOf 定位 SET 和 WHERE
     int setIdx = sql.indexOf(QRegularExpression("\\bSET\\b", QRegularExpression::CaseInsensitiveOption));
     if (setIdx == -1) return {ResponseStatus::ERROR, "Invalid UPDATE syntax", QVariant()};
@@ -290,6 +357,11 @@ Response SQLParser::execUpdate(const QString &sql) {
 }
 
 Response SQLParser::execDelete(const QString &sql) {
+    if (m_currentUser.isEmpty())
+        return {ResponseStatus::AUTH_FAILED, "请先登录", QVariant()};
+    if (m_currentDB.isEmpty())
+        return {ResponseStatus::ERROR, "请先选择或创建一个数据库", QVariant()};
+
     // 使用 indexOf 提取 WHERE
     int whereIdx = sql.indexOf(QRegularExpression("\\bWHERE\\b", QRegularExpression::CaseInsensitiveOption));
     int fromIdx = sql.indexOf(QRegularExpression("\\bFROM\\b", QRegularExpression::CaseInsensitiveOption));
@@ -382,13 +454,165 @@ QList<Field> SQLParser::parseFieldDefinitions(const QString &fieldsStr) const
     QStringList parts = fieldsStr.split(',', Qt::SkipEmptyParts);
     for (const QString &part : parts) {
         QString trimmed = part.trimmed();
-        QStringList pair = trimmed.split(' ', Qt::SkipEmptyParts);
-        if (pair.size() < 2) continue;
-        QString fieldName = pair[0];
-        FieldType type = strToFieldType(pair[1].toUpper());
-        int length = 255;
-        if (type == FieldType::INT) length = 10;
-        fields.append(Field(fieldName, type, length));
+
+        Field field;
+
+        // 解析字段名
+        QStringList tokens = trimmed.split(' ', Qt::SkipEmptyParts);
+        if (tokens.isEmpty()) continue;
+        field.name = tokens[0];
+
+        // 解析字段类型
+        if (tokens.size() < 2) continue;
+        field.type = strToFieldType(tokens[1].toUpper());
+
+        // 设置默认长度
+        field.length = 255;
+        if (field.type == FieldType::INT) field.length = 10;
+
+        // 解析约束
+        for (int i = 2; i < tokens.size(); ++i) {
+            QString token = tokens[i].toUpper();
+            QString rawToken = tokens[i];
+
+            if (token == "PRIMARY" && i+1 < tokens.size() && tokens[i+1].toUpper() == "KEY") {
+                field.isPrimaryKey = true;
+                field.isNotNull = true;
+                i++;
+            }
+            else if (token == "UNIQUE") {
+                field.isUnique = true;
+            }
+            else if (token == "NOT" && i+1 < tokens.size() && tokens[i+1].toUpper() == "NULL") {
+                field.isNotNull = true;
+                i++;
+            }
+            else if (token == "DEFAULT") {
+                QString defaultValue;
+                int j = i + 1;
+                if (j < tokens.size()) {
+                    QString val = tokens[j];
+                    if (val.startsWith('\'') || val.startsWith('"')) {
+                        defaultValue = val;
+                        j++;
+                        while (j < tokens.size()) {
+                            defaultValue += " " + tokens[j];
+                            if (tokens[j].endsWith('\'') || tokens[j].endsWith('"')) {
+                                break;
+                            }
+                            j++;
+                        }
+                        if (defaultValue.length() >= 2) {
+                            defaultValue = defaultValue.mid(1, defaultValue.length() - 2);
+                        }
+                    } else {
+                        defaultValue = val;
+                    }
+                }
+                field.defaultValue = defaultValue;
+                i = j;
+            }
+            else if (token == "CHECK" || token.startsWith("CHECK(")) {
+                field.hasCheck = true;
+                QString checkExpr;
+                int braceCount = 0;
+                int j = i;
+
+                if (token.startsWith("CHECK(")) {
+                    int contentStart = rawToken.indexOf('(') + 1;
+                    QString inner = rawToken.mid(contentStart);
+                    braceCount = 1;
+                    if (inner.endsWith(')')) {
+                        inner.chop(1);
+                        braceCount = 0;
+                    }
+                    checkExpr = inner;
+                    j = i + 1;
+                    while (j < tokens.size() && braceCount > 0) {
+                        QString tk = tokens[j];
+                        checkExpr += " " + tk;
+                        braceCount += tk.count('(');
+                        braceCount -= tk.count(')');
+                        j++;
+                    }
+                } else {
+                    j = i + 1;
+                    if (j < tokens.size() && tokens[j] == "(") {
+                        j++;
+                    }
+                    braceCount = 1;
+                    while (j < tokens.size() && braceCount > 0) {
+                        QString tk = tokens[j];
+                        checkExpr += tk + " ";
+                        braceCount += tk.count('(');
+                        braceCount -= tk.count(')');
+                        j++;
+                    }
+                }
+
+                checkExpr = checkExpr.trimmed();
+                if (checkExpr.endsWith(')')) {
+                    checkExpr = checkExpr.left(checkExpr.length() - 1).trimmed();
+                }
+                field.checkExpr = checkExpr;
+                i = j - 1;
+            }
+            else if (token == "FOREIGN" && i+1 < tokens.size() && tokens[i+1].toUpper() == "KEY") {
+                field.isForeignKey = true;
+                i += 2;
+                while (i < tokens.size()) {
+                    if (tokens[i].toUpper() == "REFERENCES") {
+                        i++;
+                        if (i < tokens.size()) {
+                            QString refRaw = tokens[i];
+                            int parenIdx = refRaw.indexOf('(');
+                            if (parenIdx != -1) {
+                                int closeParen = refRaw.lastIndexOf(')');
+                                if (closeParen > parenIdx) {
+                                    field.referenceField = refRaw.mid(parenIdx + 1, closeParen - parenIdx - 1);
+                                }
+                                field.referenceTable = refRaw.left(parenIdx);
+                            } else {
+                                field.referenceTable = refRaw;
+                                i++;
+                                if (i < tokens.size() && (tokens[i].startsWith('(') || tokens[i] == "(")) {
+                                    QString refField = tokens[i];
+                                    if (refField == "(" && i+1 < tokens.size()) {
+                                        i++;
+                                        refField = tokens[i];
+                                    }
+                                    if (refField.startsWith('(')) refField = refField.mid(1);
+                                    if (refField.endsWith(')')) refField.chop(1);
+                                    field.referenceField = refField;
+                                }
+                            }
+                            i++;
+                            if (i < tokens.size() && tokens[i].toUpper() == "CASCADE") {
+                                field.cascadeRule = "CASCADE";
+                                i++;
+                            } else if (i < tokens.size() && tokens[i].toUpper() == "SET" && i+1 < tokens.size() && tokens[i+1].toUpper() == "NULL") {
+                                field.cascadeRule = "SET NULL";
+                                i += 2;
+                            }
+                        }
+                        break;
+                    }
+                    i++;
+                }
+                i--;
+            }
+            else if (token == "FORMAT") {
+                if (i+1 < tokens.size()) {
+                    field.formatValidation = tokens[i+1].toLower();
+                    i++;
+                }
+            }
+            else if (token == "ENCRYPTED") {
+                field.isEncrypted = true;
+            }
+        }
+
+        fields.append(field);
     }
     return fields;
 }

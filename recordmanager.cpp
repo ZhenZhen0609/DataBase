@@ -1,4 +1,6 @@
 #include "recordmanager.h"
+#include "storagemanager.h"
+#include "constraintmanager.h"
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -33,32 +35,31 @@ QList<Field> RecordManager::loadTableSchema(const QString &username, const QStri
     QList<Field> fields;
     QString tdfPath = getTdfFilePath(username, dbName, tableName);
     QFile file(tdfPath);
-    
+
     if (!file.exists()) {
         qDebug() << "[Record] Table schema file not found:" << tdfPath;
         return fields;
     }
-    
-    // 获取读锁
+
     lockManager.acquireReadLock(username, dbName, tableName);
-    
+
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qDebug() << "[Record] Failed to open schema file:" << tdfPath;
         lockManager.releaseReadLock(username, dbName, tableName);
         return fields;
     }
-    
+
     QByteArray data = file.readAll();
     file.close();
-    
+
     lockManager.releaseReadLock(username, dbName, tableName);
-    
+
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isObject()) {
         qDebug() << "[Record] Invalid schema file format";
         return fields;
     }
-    
+
     QJsonArray fieldsArray = doc.object()["fields"].toArray();
     for (const QJsonValue &val : fieldsArray) {
         QJsonObject obj = val.toObject();
@@ -68,73 +69,92 @@ QList<Field> RecordManager::loadTableSchema(const QString &username, const QStri
         f.length = obj["length"].toInt();
         f.isNotNull = obj["isNotNull"].toBool();
         f.isPrimaryKey = obj["isPrimaryKey"].toBool();
+        f.isUnique = obj["isUnique"].toBool();
+        f.hasCheck = obj["hasCheck"].toBool();
+        f.checkExpr = obj["checkExpr"].toString();
+        f.defaultValue = obj["defaultValue"].toString();
+        f.hasIndex = obj["hasIndex"].toBool();
+        f.isForeignKey = obj["isForeignKey"].toBool();
+        f.referenceTable = obj["referenceTable"].toString();
+        f.referenceField = obj["referenceField"].toString();
+        f.cascadeRule = obj["cascadeRule"].toString();
+        f.formatValidation = obj["formatValidation"].toString();
+        f.isEncrypted = obj["isEncrypted"].toBool();
         fields.append(f);
     }
-    
+
     return fields;
 }
 
 Response RecordManager::validateRecord(const QList<Field> &fields, const QJsonObject &data)
 {
     for (const Field &f : fields) {
-        if (!data.contains(f.name)) {
-            if (f.isNotNull) {
-                return {ResponseStatus::ERROR, QString("[Record] 字段 '%1' 为必填字段").arg(f.name), QVariant()};
+        QJsonValue val = data.value(f.name);
+
+        if (f.isNotNull) {
+            if (val.isNull() || val.isUndefined()) {
+                return {ResponseStatus::ERROR, QString("[Record] Field '%1' is required").arg(f.name), QVariant()};
             }
+            if (val.isString() && val.toString().trimmed().isEmpty()) {
+                return {ResponseStatus::ERROR, QString("[Record] Field '%1' is required").arg(f.name), QVariant()};
+            }
+            if (val.isDouble() && val.toDouble() == 0 && !data.contains(f.name)) {
+                return {ResponseStatus::ERROR, QString("[Record] Field '%1' is required").arg(f.name), QVariant()};
+            }
+        }
+
+        if (!data.contains(f.name)) {
             continue;
         }
-        
-        QJsonValue val = data[f.name];
-        
+
         switch (f.type) {
             case FieldType::INT:
                 if (!val.isDouble()) {
-                    return {ResponseStatus::ERROR, QString("[Record] 字段 '%1' 需要整数类型").arg(f.name), QVariant()};
+                    return {ResponseStatus::ERROR, QString("[Record] Field '%1' must be integer").arg(f.name), QVariant()};
                 }
                 if (val.toDouble() != val.toInt()) {
-                    return {ResponseStatus::ERROR, QString("[Record] 字段 '%1' 需要整数类型").arg(f.name), QVariant()};
+                    return {ResponseStatus::ERROR, QString("[Record] Field '%1' must be integer").arg(f.name), QVariant()};
                 }
                 break;
-                
+
             case FieldType::DOUBLE:
                 if (!val.isDouble()) {
-                    return {ResponseStatus::ERROR, QString("[Record] 字段 '%1' 需要小数类型").arg(f.name), QVariant()};
+                    return {ResponseStatus::ERROR, QString("[Record] Field '%1' must be number").arg(f.name), QVariant()};
                 }
                 break;
-                
+
             case FieldType::BOOLEAN:
                 if (!val.isBool()) {
-                    return {ResponseStatus::ERROR, QString("[Record] 字段 '%1' 需要布尔类型").arg(f.name), QVariant()};
+                    return {ResponseStatus::ERROR, QString("[Record] Field '%1' must be boolean").arg(f.name), QVariant()};
                 }
                 break;
-                
+
             case FieldType::TEXT:
                 if (!val.isString()) {
-                    return {ResponseStatus::ERROR, QString("[Record] 字段 '%1' 需要文本类型").arg(f.name), QVariant()};
+                    return {ResponseStatus::ERROR, QString("[Record] Field '%1' must be text").arg(f.name), QVariant()};
                 }
                 if (f.length > 0 && val.toString().length() > f.length) {
-                    return {ResponseStatus::ERROR, QString("[Record] 字段 '%1' 长度超过限制(%2)").arg(f.name).arg(f.length), QVariant()};
+                    return {ResponseStatus::ERROR, QString("[Record] Field '%1' exceeds length limit (%2)").arg(f.name).arg(f.length), QVariant()};
                 }
                 break;
         }
     }
-    
-    return {ResponseStatus::OK, "[Record] 数据校验通过", QVariant()};
+
+    return {ResponseStatus::OK, "[Record] Data validation passed", QVariant()};
 }
 
-//序列化数据
 QByteArray RecordManager::serializeRecord(const QJsonObject &record, const QList<Field> &fields)
 {
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
     stream.setByteOrder(QDataStream::LittleEndian);
-    
+
     int fieldCount = fields.size();
     stream << fieldCount;
-    
+
     for (const Field &f : fields) {
         QJsonValue val = record.value(f.name);
-        
+
         switch (f.type) {
             case FieldType::INT:
                 stream << val.toInt();
@@ -152,22 +172,23 @@ QByteArray RecordManager::serializeRecord(const QJsonObject &record, const QList
             }
         }
     }
-    
+
     QString createdAt = record["_created_at"].toString();
     stream << createdAt;
-    
+
     return data;
 }
 
 QJsonObject RecordManager::deserializeRecord(const QByteArray &data, const QList<Field> &fields)
 {
     QJsonObject record;
-    QDataStream stream(data);
+    QByteArray mutableData = data;
+    QDataStream stream(&mutableData, QIODevice::ReadOnly);
     stream.setByteOrder(QDataStream::LittleEndian);
-    
+
     int fieldCount;
     stream >> fieldCount;
-    
+
     for (const Field &f : fields) {
         switch (f.type) {
             case FieldType::INT: {
@@ -196,12 +217,90 @@ QJsonObject RecordManager::deserializeRecord(const QByteArray &data, const QList
             }
         }
     }
-    
+
     QString createdAt;
     stream >> createdAt;
     record["_created_at"] = createdAt;
-    
+
     return record;
+}
+
+QJsonArray RecordManager::readAllRecordsFromCache(const QString &username, const QString &dbName, const QString &tableName, const QList<Field> &fields)
+{
+    QJsonArray records;
+    StorageManager storage;
+
+    QByteArray data = storage.readTableData(username, dbName, tableName);
+    if (data.isEmpty()) {
+        return records;
+    }
+
+    QDataStream stream(&data, QIODevice::ReadOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+
+    while (!stream.atEnd()) {
+        qint64 recordSize;
+        if (stream.readRawData(reinterpret_cast<char*>(&recordSize), sizeof(qint64)) != sizeof(qint64)) {
+            break;
+        }
+
+        QByteArray recordData(recordSize, 0);
+        if (stream.readRawData(recordData.data(), recordSize) != recordSize) {
+            break;
+        }
+
+        QJsonObject record = deserializeRecord(recordData, fields);
+        decryptRecord(record, fields);
+        records.append(record);
+    }
+
+    return records;
+}
+
+bool RecordManager::writeAllRecordsToCache(const QString &username, const QString &dbName, const QString &tableName, const QList<Field> &fields, const QJsonArray &records)
+{
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+
+    for (const QJsonValue &val : records) {
+        QJsonObject record = val.toObject();
+        QJsonObject encryptedRecord = record;
+        encryptRecord(encryptedRecord, fields);
+        QByteArray recordData = serializeRecord(encryptedRecord, fields);
+        qint64 recordSize = recordData.size();
+        stream.writeRawData(reinterpret_cast<const char*>(&recordSize), sizeof(qint64));
+        stream.writeRawData(recordData.data(), recordSize);
+    }
+
+    StorageManager storage;
+    return storage.writeTableData(username, dbName, tableName, data);
+}
+
+void RecordManager::encryptRecord(QJsonObject &record, const QList<Field> &fields)
+{
+    for (const Field &field : fields) {
+        if (field.isEncrypted && record.contains(field.name)) {
+            QJsonValue val = record[field.name];
+            if (val.isString()) {
+                QString encrypted = ConstraintManager::encrypt(val.toString());
+                record[field.name] = encrypted;
+            }
+        }
+    }
+}
+
+void RecordManager::decryptRecord(QJsonObject &record, const QList<Field> &fields)
+{
+    for (const Field &field : fields) {
+        if (field.isEncrypted && record.contains(field.name)) {
+            QJsonValue val = record[field.name];
+            if (val.isString()) {
+                QString decrypted = ConstraintManager::decrypt(val.toString());
+                record[field.name] = decrypted;
+            }
+        }
+    }
 }
 
 Response RecordManager::insertRecord(const QString &username, const QString &dbName, const QString &tableName, const QJsonObject &data)
@@ -214,89 +313,94 @@ Response RecordManager::insertRecord(const QString &username, const QString &dbN
         return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' schema not found").arg(tableName), QVariant()};
     }
 
-    Response validateResp = validateRecord(fields, data);
+    QJsonObject newRecord = data;
+    for (const Field &field : fields) {
+        if (!newRecord.contains(field.name) && !field.defaultValue.isEmpty()) {
+            switch (field.type) {
+                case FieldType::INT:
+                    newRecord[field.name] = field.defaultValue.toInt();
+                    break;
+                case FieldType::DOUBLE:
+                    newRecord[field.name] = field.defaultValue.toDouble();
+                    break;
+                case FieldType::TEXT:
+                    newRecord[field.name] = field.defaultValue;
+                    break;
+                case FieldType::BOOLEAN:
+                    newRecord[field.name] = (field.defaultValue.toLower() == "true");
+                    break;
+            }
+        }
+    }
+    newRecord["_created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    Response validateResp = validateRecord(fields, newRecord);
     if (validateResp.status != ResponseStatus::OK) {
         return validateResp;
     }
 
-    QString trdPath = getTrdFilePath(username, dbName, tableName);
-    QFile file(trdPath);
+    QJsonArray existingRecords = readAllRecordsFromCache(username, dbName, tableName, fields);
 
-    QJsonObject newRecord = data;
-    newRecord["_created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-
-    QByteArray recordData = serializeRecord(newRecord, fields);
-
-    // 获取写锁
-    lockManager.acquireWriteLock(username, dbName, tableName);
-
-    if (!file.open(QIODevice::Append)) {
-        lockManager.releaseWriteLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1'").arg(tableName), QVariant()};
+    for (const Field &field : fields) {
+        if (field.isForeignKey) {
+            Response fkResp = ConstraintManager::validateForeignKey(username, dbName, field, newRecord[field.name].toVariant());
+            if (fkResp.status != ResponseStatus::OK) {
+                return fkResp;
+            }
+        }
     }
 
-    qint64 recordSize = recordData.size();
-    file.write(reinterpret_cast<const char*>(&recordSize), sizeof(qint64));
-    file.write(recordData);
-    file.close();
-    
+    for (const Field &field : fields) {
+        if (!field.formatValidation.isEmpty()) {
+            Response formatResp = ConstraintManager::validateFormat(field, newRecord[field.name].toVariant());
+            if (formatResp.status != ResponseStatus::OK) {
+                return formatResp;
+            }
+        }
+    }
+
+    for (const Field &field : fields) {
+        if (field.hasCheck) {
+            Response checkResp = ConstraintManager::validateCheckConstraint(field, newRecord);
+            if (checkResp.status != ResponseStatus::OK) {
+                return checkResp;
+            }
+        }
+    }
+
+    Response uniqueResp = ConstraintManager::validateUnique(fields, existingRecords, newRecord, false);
+    if (uniqueResp.status != ResponseStatus::OK) {
+        return uniqueResp;
+    }
+
+    lockManager.acquireWriteLock(username, dbName, tableName);
+
+    existingRecords.append(newRecord);
+    bool success = writeAllRecordsToCache(username, dbName, tableName, fields, existingRecords);
+
     lockManager.releaseWriteLock(username, dbName, tableName);
 
-    return {ResponseStatus::OK, QString("[Record] Successfully inserted 1 record into \"%1\"").arg(tableName), QVariant(1)};
+    if (!success) {
+        return {ResponseStatus::ERROR, QString("[Record] Failed to write data to table '%1'").arg(tableName), QVariant()};
+    }
+
+    return {ResponseStatus::OK, QString("[Record] Successfully inserted 1 record into '%1'").arg(tableName), QVariant(1)};
 }
 
 Response RecordManager::selectAllRecords(const QString &username, const QString &dbName, const QString &tableName)
 {
-    QString trdPath = getTrdFilePath(username, dbName, tableName);
-    QFile file(trdPath);
-
-    if (!file.exists())
-        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
-
-    // 获取读锁
-    lockManager.acquireReadLock(username, dbName, tableName);
-
-    if (!file.open(QIODevice::ReadOnly)) {
-        lockManager.releaseReadLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1'").arg(tableName), QVariant()};
-    }
-
     QList<Field> fields = loadTableSchema(username, dbName, tableName);
     if (fields.isEmpty()) {
-        lockManager.releaseReadLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to load schema for '%1'").arg(tableName), QVariant()};
+        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
     }
 
-    QJsonArray records;
-    qint64 fileSize = file.size();
-    qint64 pos = 0;
-
-    while (pos < fileSize) {
-        qint64 recordSize;
-        if (file.read(reinterpret_cast<char*>(&recordSize), sizeof(qint64)) != sizeof(qint64)) {
-            lockManager.releaseReadLock(username, dbName, tableName);
-            break;
-        }
-
-        QByteArray recordData = file.read(recordSize);
-        if (recordData.size() != recordSize) {
-            lockManager.releaseReadLock(username, dbName, tableName);
-            break;
-        }
-
-        QJsonObject record = deserializeRecord(recordData, fields);
-        records.append(record);
-
-        pos += sizeof(qint64) + recordSize;
-    }
-
-    file.close();
+    lockManager.acquireReadLock(username, dbName, tableName);
+    QJsonArray records = readAllRecordsFromCache(username, dbName, tableName, fields);
     lockManager.releaseReadLock(username, dbName, tableName);
 
     return {ResponseStatus::OK, QString("[Record] Retrieved %1 records").arg(records.size()), QVariant::fromValue(records)};
 }
 
-//获取表的主键字段名
 QString RecordManager::getPrimaryKeyField(const QList<Field> &fields) const
 {
     for (const Field &f : fields) {
@@ -309,12 +413,6 @@ QString RecordManager::getPrimaryKeyField(const QList<Field> &fields) const
 
 Response RecordManager::updateRecord(const QString &username, const QString &dbName, const QString &tableName, const QString &recordId, const QJsonObject &newData)
 {
-    QString trdPath = getTrdFilePath(username, dbName, tableName);
-    QFile file(trdPath);
-
-    if (!file.exists())
-        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
-
     QList<Field> fields = loadTableSchema(username, dbName, tableName);
     if (fields.isEmpty()) {
         return {ResponseStatus::ERROR, QString("[Record] Failed to load schema for '%1'").arg(tableName), QVariant()};
@@ -322,77 +420,89 @@ Response RecordManager::updateRecord(const QString &username, const QString &dbN
 
     QString pkField = getPrimaryKeyField(fields);
 
-    // 读取所有记录
-    if (!file.open(QIODevice::ReadOnly))
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1'").arg(tableName), QVariant()};
+    lockManager.acquireReadLock(username, dbName, tableName);
+    QJsonArray records = readAllRecordsFromCache(username, dbName, tableName, fields);
+    lockManager.releaseReadLock(username, dbName, tableName);
 
-    QList<QByteArray> allRecords;
-    qint64 fileSize = file.size();
-    qint64 pos = 0;
     bool found = false;
     int foundIndex = -1;
+    QJsonObject targetRecord;
 
-    while (pos < fileSize) {
-        qint64 recordSize;
-        if (file.read(reinterpret_cast<char*>(&recordSize), sizeof(qint64)) != sizeof(qint64))
-            break;
-
-        QByteArray recordData = file.read(recordSize);
-        if (recordData.size() != recordSize)
-            break;
-
-        QJsonObject record = deserializeRecord(recordData, fields);
+    for (int i = 0; i < records.size(); ++i) {
+        QJsonObject record = records[i].toObject();
         QString currentId = record[pkField].toString();
         if (currentId == recordId) {
-            // 更新记录
-            QJsonObject updatedRecord = record;
-            for (const QString &key : newData.keys()) {
-                updatedRecord[key] = newData[key];
-            }
-            updatedRecord["_created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-            allRecords.append(serializeRecord(updatedRecord, fields));
+            targetRecord = record;
+            foundIndex = i;
             found = true;
-            foundIndex = allRecords.size() - 1;
-        } else {
-            allRecords.append(recordData);
+            break;
         }
-
-        pos += sizeof(qint64) + recordSize;
     }
-    file.close();
 
     if (!found) {
         return {ResponseStatus::ERROR, QString("[Record] Record with '%1'='%2' not found").arg(pkField).arg(recordId), QVariant()};
     }
 
-    // 获取写锁
+    QJsonObject updatedRecord = targetRecord;
+    for (const QString &key : newData.keys()) {
+        updatedRecord[key] = newData[key];
+    }
+    updatedRecord["_created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    Response validateResp = validateRecord(fields, updatedRecord);
+    if (validateResp.status != ResponseStatus::OK) {
+        return validateResp;
+    }
+
+    for (const Field &field : fields) {
+        if (field.isForeignKey && newData.contains(field.name)) {
+            Response fkResp = ConstraintManager::validateForeignKey(username, dbName, field, updatedRecord[field.name].toVariant());
+            if (fkResp.status != ResponseStatus::OK) {
+                return fkResp;
+            }
+        }
+    }
+
+    for (const Field &field : fields) {
+        if (!field.formatValidation.isEmpty() && newData.contains(field.name)) {
+            Response formatResp = ConstraintManager::validateFormat(field, updatedRecord[field.name].toVariant());
+            if (formatResp.status != ResponseStatus::OK) {
+                return formatResp;
+            }
+        }
+    }
+
+    for (const Field &field : fields) {
+        if (field.hasCheck) {
+            Response checkResp = ConstraintManager::validateCheckConstraint(field, updatedRecord);
+            if (checkResp.status != ResponseStatus::OK) {
+                return checkResp;
+            }
+        }
+    }
+
+    Response uniqueResp = ConstraintManager::validateUnique(fields, records, updatedRecord, true);
+    if (uniqueResp.status != ResponseStatus::OK) {
+        return uniqueResp;
+    }
+
+    ConstraintManager::cascadeUpdate(username, dbName, tableName, recordId, newData);
+
     lockManager.acquireWriteLock(username, dbName, tableName);
-
-    // 重写整个文件
-    if (!file.open(QIODevice::WriteOnly)) {
-        lockManager.releaseWriteLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1' for writing").arg(tableName), QVariant()};
-    }
-
-    for (const QByteArray &recordData : allRecords) {
-        qint64 recordSize = recordData.size();
-        file.write(reinterpret_cast<const char*>(&recordSize), sizeof(qint64));
-        file.write(recordData);
-    }
-    file.close();
-    
+    records[foundIndex] = updatedRecord;
+    bool success = writeAllRecordsToCache(username, dbName, tableName, fields, records);
     lockManager.releaseWriteLock(username, dbName, tableName);
+
+    if (!success) {
+        return {ResponseStatus::ERROR, QString("[Record] Failed to write updated data to table '%1'").arg(tableName), QVariant()};
+    }
 
     return {ResponseStatus::OK, QString("[Record] Updated 1 record in '%1'").arg(tableName), QVariant(1)};
 }
 
 Response RecordManager::deleteRecord(const QString &username, const QString &dbName, const QString &tableName, const QString &recordId)
 {
-    QString trdPath = getTrdFilePath(username, dbName, tableName);
-    QFile file(trdPath);
-
-    if (!file.exists())
-        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
+    qDebug() << QString("[Record] deleteRecord: table=%1 recordId=%2").arg(tableName).arg(recordId);
 
     QList<Field> fields = loadTableSchema(username, dbName, tableName);
     if (fields.isEmpty()) {
@@ -400,85 +510,57 @@ Response RecordManager::deleteRecord(const QString &username, const QString &dbN
     }
 
     QString pkField = getPrimaryKeyField(fields);
+    qDebug() << QString("[Record] deleteRecord: pkField=%1").arg(pkField);
 
-    // 读取所有记录
-    if (!file.open(QIODevice::ReadOnly))
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1'").arg(tableName), QVariant()};
+    lockManager.acquireReadLock(username, dbName, tableName);
+    QJsonArray records = readAllRecordsFromCache(username, dbName, tableName, fields);
+    lockManager.releaseReadLock(username, dbName, tableName);
 
-    QList<QByteArray> remainingRecords;
-    qint64 fileSize = file.size();
-    qint64 pos = 0;
+    qDebug() << QString("[Record] deleteRecord: read %1 records from %2").arg(records.size()).arg(tableName);
+
     bool found = false;
+    QJsonArray remainingRecords;
 
-    while (pos < fileSize) {
-        qint64 recordSize;
-        if (file.read(reinterpret_cast<char*>(&recordSize), sizeof(qint64)) != sizeof(qint64))
-            break;
-
-        QByteArray recordData = file.read(recordSize);
-        if (recordData.size() != recordSize)
-            break;
-
-        QJsonObject record = deserializeRecord(recordData, fields);
+    for (const QJsonValue &val : records) {
+        QJsonObject record = val.toObject();
         QString currentId = record[pkField].toString();
         if (currentId != recordId) {
-            remainingRecords.append(recordData);
+            remainingRecords.append(record);
         } else {
             found = true;
+            qDebug() << QString("[Record] deleteRecord: found record with %1=%2, removing it").arg(pkField).arg(currentId);
         }
-
-        pos += sizeof(qint64) + recordSize;
     }
-    file.close();
 
     if (!found) {
+        qDebug() << QString("[Record] deleteRecord: record with %1=%2 NOT FOUND!").arg(pkField).arg(recordId);
         return {ResponseStatus::ERROR, QString("[Record] Record with '%1'='%2' not found").arg(pkField).arg(recordId), QVariant()};
     }
 
-    // 获取写锁
+    qDebug() << QString("[Record] deleteRecord: calling cascadeDelete for %1.%2").arg(tableName).arg(recordId);
+    ConstraintManager::cascadeDelete(username, dbName, tableName, recordId);
+
+    qDebug() << QString("[Record] deleteRecord: writing back %1 remaining records (was %2)")
+                .arg(remainingRecords.size()).arg(records.size());
+
     lockManager.acquireWriteLock(username, dbName, tableName);
-
-    // 重写整个文件（不包含被删除的记录）
-    if (!file.open(QIODevice::WriteOnly)) {
-        lockManager.releaseWriteLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1' for writing").arg(tableName), QVariant()};
-    }
-
-    for (const QByteArray &recordData : remainingRecords) {
-        qint64 recordSize = recordData.size();
-        file.write(reinterpret_cast<const char*>(&recordSize), sizeof(qint64));
-        file.write(recordData);
-    }
-    file.close();
-    
+    bool success = writeAllRecordsToCache(username, dbName, tableName, fields, remainingRecords);
     lockManager.releaseWriteLock(username, dbName, tableName);
+
+    if (!success) {
+        return {ResponseStatus::ERROR, QString("[Record] Failed to delete record from table '%1'").arg(tableName), QVariant()};
+    }
 
     return {ResponseStatus::OK, QString("[Record] Deleted 1 record from '%1'").arg(tableName), QVariant(1)};
 }
 
 Response RecordManager::selectWhere(const QString &username, const QString &dbName, const QString &tableName, const QString &fieldName, const QVariant &value)
 {
-    QString trdPath = getTrdFilePath(username, dbName, tableName);
-    QFile file(trdPath);
-
-    if (!file.exists())
-        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
-
-    // 获取读锁
-    lockManager.acquireReadLock(username, dbName, tableName);
-
-    if (!file.open(QIODevice::ReadOnly)) {
-        lockManager.releaseReadLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1'").arg(tableName), QVariant()};
-    }
-
     QList<Field> fields = loadTableSchema(username, dbName, tableName);
     if (fields.isEmpty()) {
-        lockManager.releaseReadLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to load schema for '%1'").arg(tableName), QVariant()};
+        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
     }
 
-    // 检查字段是否存在
     bool fieldExists = false;
     FieldType fieldType = FieldType::TEXT;
     for (const Field &f : fields) {
@@ -488,36 +570,23 @@ Response RecordManager::selectWhere(const QString &username, const QString &dbNa
             break;
         }
     }
-    
+
     if (!fieldExists) {
-        lockManager.releaseReadLock(username, dbName, tableName);
         return {ResponseStatus::ERROR, QString("[Record] Field '%1' not found in table '%2'").arg(fieldName).arg(tableName), QVariant()};
     }
 
-    QJsonArray records;
-    qint64 fileSize = file.size();
-    qint64 pos = 0;
+    lockManager.acquireReadLock(username, dbName, tableName);
+    QJsonArray allRecords = readAllRecordsFromCache(username, dbName, tableName, fields);
+    lockManager.releaseReadLock(username, dbName, tableName);
 
-    while (pos < fileSize) {
-        qint64 recordSize;
-        if (file.read(reinterpret_cast<char*>(&recordSize), sizeof(qint64)) != sizeof(qint64)) {
-            lockManager.releaseReadLock(username, dbName, tableName);
-            break;
-        }
-
-        QByteArray recordData = file.read(recordSize);
-        if (recordData.size() != recordSize) {
-            lockManager.releaseReadLock(username, dbName, tableName);
-            break;
-        }
-
-        QJsonObject record = deserializeRecord(recordData, fields);
+    QJsonArray matchingRecords;
+    for (const QJsonValue &val : allRecords) {
+        QJsonObject record = val.toObject();
         QJsonValue recordValue = record[fieldName];
-        
-        // 根据字段类型进行比较
+
         bool match = false;
         QString strValue = value.toString();
-        
+
         switch (fieldType) {
             case FieldType::INT:
                 match = recordValue.toInt() == value.toInt();
@@ -529,72 +598,38 @@ Response RecordManager::selectWhere(const QString &username, const QString &dbNa
                 match = recordValue.toBool() == value.toBool();
                 break;
             case FieldType::TEXT:
-                // 文本字段支持模糊匹配
                 match = recordValue.toString().contains(strValue, Qt::CaseInsensitive);
                 break;
         }
 
         if (match) {
-            records.append(record);
+            matchingRecords.append(record);
         }
-
-        pos += sizeof(qint64) + recordSize;
     }
 
-    file.close();
-    lockManager.releaseReadLock(username, dbName, tableName);
-
-    return {ResponseStatus::OK, QString("[Record] Found %1 records matching '%2'").arg(records.size()).arg(fieldName), QVariant::fromValue(records)};
+    return {ResponseStatus::OK, QString("[Record] Found %1 records matching '%2'").arg(matchingRecords.size()).arg(fieldName), QVariant::fromValue(matchingRecords)};
 }
 
 Response RecordManager::selectWithCondition(const QString &username, const QString &dbName, const QString &tableName, const QJsonObject &condition)
 {
-    QString trdPath = getTrdFilePath(username, dbName, tableName);
-    QFile file(trdPath);
-
-    if (!file.exists())
-        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
-
-    // 获取读锁
-    lockManager.acquireReadLock(username, dbName, tableName);
-
-    if (!file.open(QIODevice::ReadOnly)) {
-        lockManager.releaseReadLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1'").arg(tableName), QVariant()};
-    }
-
     QList<Field> fields = loadTableSchema(username, dbName, tableName);
     if (fields.isEmpty()) {
-        lockManager.releaseReadLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to load schema for '%1'").arg(tableName), QVariant()};
+        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
     }
 
-    QJsonArray records;
-    qint64 fileSize = file.size();
-    qint64 pos = 0;
+    lockManager.acquireReadLock(username, dbName, tableName);
+    QJsonArray allRecords = readAllRecordsFromCache(username, dbName, tableName, fields);
+    lockManager.releaseReadLock(username, dbName, tableName);
 
-    while (pos < fileSize) {
-        qint64 recordSize;
-        if (file.read(reinterpret_cast<char*>(&recordSize), sizeof(qint64)) != sizeof(qint64)) {
-            lockManager.releaseReadLock(username, dbName, tableName);
-            break;
-        }
-
-        QByteArray recordData = file.read(recordSize);
-        if (recordData.size() != recordSize) {
-            lockManager.releaseReadLock(username, dbName, tableName);
-            break;
-        }
-
-        QJsonObject record = deserializeRecord(recordData, fields);
-        
-        // 检查是否满足所有条件
+    QJsonArray matchingRecords;
+    for (const QJsonValue &val : allRecords) {
+        QJsonObject record = val.toObject();
         bool match = true;
+
         for (const QString &key : condition.keys()) {
             QJsonValue conditionValue = condition[key];
             QJsonValue recordValue = record[key];
-            
-            // 简单相等比较
+
             if (conditionValue.isString() && recordValue.isString()) {
                 if (recordValue.toString() != conditionValue.toString()) {
                     match = false;
@@ -614,77 +649,43 @@ Response RecordManager::selectWithCondition(const QString &username, const QStri
         }
 
         if (match) {
-            records.append(record);
+            matchingRecords.append(record);
         }
-
-        pos += sizeof(qint64) + recordSize;
     }
 
-    file.close();
-    lockManager.releaseReadLock(username, dbName, tableName);
-
-    return {ResponseStatus::OK, QString("[Record] Found %1 records matching condition").arg(records.size()), QVariant::fromValue(records)};
+    return {ResponseStatus::OK, QString("[Record] Found %1 records matching condition").arg(matchingRecords.size()), QVariant::fromValue(matchingRecords)};
 }
 
 Response RecordManager::selectWithLimitOffset(const QString &username, const QString &dbName, const QString &tableName, int limit, int offset)
 {
-    QString trdPath = getTrdFilePath(username, dbName, tableName);
-    QFile file(trdPath);
-
-    if (!file.exists())
-        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
-
-    // 获取读锁
-    lockManager.acquireReadLock(username, dbName, tableName);
-
-    if (!file.open(QIODevice::ReadOnly)) {
-        lockManager.releaseReadLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open table '%1'").arg(tableName), QVariant()};
-    }
-
     QList<Field> fields = loadTableSchema(username, dbName, tableName);
     if (fields.isEmpty()) {
-        lockManager.releaseReadLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to load schema for '%1'").arg(tableName), QVariant()};
+        return {ResponseStatus::TABLE_NOT_FOUND, QString("[Record] Table '%1' not found").arg(tableName), QVariant()};
     }
 
-    QJsonArray records;
-    qint64 fileSize = file.size();
-    qint64 pos = 0;
+    lockManager.acquireReadLock(username, dbName, tableName);
+    QJsonArray allRecords = readAllRecordsFromCache(username, dbName, tableName, fields);
+    lockManager.releaseReadLock(username, dbName, tableName);
+
+    QJsonArray pagedRecords;
     int skipped = 0;
     int count = 0;
 
-    while (pos < fileSize && count < limit) {
-        qint64 recordSize;
-        if (file.read(reinterpret_cast<char*>(&recordSize), sizeof(qint64)) != sizeof(qint64)) {
-            lockManager.releaseReadLock(username, dbName, tableName);
-            break;
-        }
-
-        QByteArray recordData = file.read(recordSize);
-        if (recordData.size() != recordSize) {
-            lockManager.releaseReadLock(username, dbName, tableName);
-            break;
-        }
-
-        // 跳过 offset 个记录
+    for (const QJsonValue &val : allRecords) {
         if (skipped < offset) {
             skipped++;
-            pos += sizeof(qint64) + recordSize;
             continue;
         }
 
-        QJsonObject record = deserializeRecord(recordData, fields);
-        records.append(record);
-        count++;
+        if (count >= limit) {
+            break;
+        }
 
-        pos += sizeof(qint64) + recordSize;
+        pagedRecords.append(val);
+        count++;
     }
 
-    file.close();
-    lockManager.releaseReadLock(username, dbName, tableName);
-
-    return {ResponseStatus::OK, QString("[Record] Retrieved %1 records (limit=%2, offset=%3)").arg(records.size()).arg(limit).arg(offset), QVariant::fromValue(records)};
+    return {ResponseStatus::OK, QString("[Record] Retrieved %1 records (limit=%2, offset=%3)").arg(pagedRecords.size()).arg(limit).arg(offset), QVariant::fromValue(pagedRecords)};
 }
 
 Response RecordManager::replaceAllRecords(const QString &username, const QString &dbName, const QString &tableName, const QJsonArray &records)
@@ -693,26 +694,13 @@ Response RecordManager::replaceAllRecords(const QString &username, const QString
     if (fields.isEmpty())
         return {ResponseStatus::TABLE_NOT_FOUND, "[Record] Table schema not found", QVariant()};
 
-    QString trdPath = getTrdFilePath(username, dbName, tableName);
-    QFile file(trdPath);
-
-    // 获取写锁
     lockManager.acquireWriteLock(username, dbName, tableName);
-
-    if (!file.open(QIODevice::WriteOnly)) {
-        lockManager.releaseWriteLock(username, dbName, tableName);
-        return {ResponseStatus::ERROR, QString("[Record] Failed to open '%1' for writing").arg(tableName), QVariant()};
-    }
-
-    for (const QJsonValue &val : records) {
-        QJsonObject record = val.toObject();
-        QByteArray recordData = serializeRecord(record, fields);
-        qint64 recordSize = recordData.size();
-        file.write(reinterpret_cast<const char*>(&recordSize), sizeof(qint64));
-        file.write(recordData);
-    }
-    file.close();
+    bool success = writeAllRecordsToCache(username, dbName, tableName, fields, records);
     lockManager.releaseWriteLock(username, dbName, tableName);
+
+    if (!success) {
+        return {ResponseStatus::ERROR, QString("[Record] Failed to replace records in '%1'").arg(tableName), QVariant()};
+    }
 
     return {ResponseStatus::OK, QString("[Record] Replaced %1 records in '%2'").arg(records.size()).arg(tableName), QVariant()};
 }
