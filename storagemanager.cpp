@@ -158,6 +158,17 @@ bool StorageManager::createTable(const QString &username, QString dbName, QStrin
         return false;
     }
 
+    // 验证外键引用的表是否存在
+    for (const Field &field : fields) {
+        if (field.isForeignKey && !field.referenceTable.isEmpty()) {
+            QString refTableTdfPath = dir.filePath(field.referenceTable + ".tdf");
+            if (!QFile(refTableTdfPath).exists()) {
+                qDebug() << "[Storage] Error: Foreign key reference table '" << field.referenceTable << "' not found for field '" << field.name << "'";
+                return false;
+            }
+        }
+    }
+
     if (!trdFile.open(QIODevice::WriteOnly)) {
         qDebug() << "[Storage] Error: Failed to create .trd file.";
         return false;
@@ -176,6 +187,17 @@ bool StorageManager::createTable(const QString &username, QString dbName, QStrin
         fieldObj["length"] = field.length;
         fieldObj["isNotNull"] = field.isNotNull;
         fieldObj["isPrimaryKey"] = field.isPrimaryKey;
+        fieldObj["isUnique"] = field.isUnique;
+        fieldObj["hasCheck"] = field.hasCheck;
+        fieldObj["checkExpr"] = field.checkExpr;
+        fieldObj["defaultValue"] = field.defaultValue;
+        fieldObj["hasIndex"] = field.hasIndex;
+        fieldObj["isForeignKey"] = field.isForeignKey;
+        fieldObj["referenceTable"] = field.referenceTable;
+        fieldObj["referenceField"] = field.referenceField;
+        fieldObj["cascadeRule"] = field.cascadeRule;
+        fieldObj["formatValidation"] = field.formatValidation;
+        fieldObj["isEncrypted"] = field.isEncrypted;
         fieldsArray.append(fieldObj);
     }
     schemaObj["fields"] = fieldsArray;
@@ -261,6 +283,17 @@ QList<Field> StorageManager::loadTableSchema(const QString &username, QString db
         field.length = fieldObj["length"].toInt();
         field.isNotNull = fieldObj["isNotNull"].toBool();
         field.isPrimaryKey = fieldObj["isPrimaryKey"].toBool();
+        field.isUnique = fieldObj["isUnique"].toBool();
+        field.hasCheck = fieldObj["hasCheck"].toBool();
+        field.checkExpr = fieldObj["checkExpr"].toString();
+        field.defaultValue = fieldObj["defaultValue"].toString();
+        field.hasIndex = fieldObj["hasIndex"].toBool();
+        field.isForeignKey = fieldObj["isForeignKey"].toBool();
+        field.referenceTable = fieldObj["referenceTable"].toString();
+        field.referenceField = fieldObj["referenceField"].toString();
+        field.cascadeRule = fieldObj["cascadeRule"].toString();
+        field.formatValidation = fieldObj["formatValidation"].toString();
+        field.isEncrypted = fieldObj["isEncrypted"].toBool();
         fields.append(field);
     }
 
@@ -744,8 +777,12 @@ void StorageManager::resetSystemStats()
 bool StorageManager::backupDatabase(const QString &username, const QString &dbName)
 {
     QString sourcePath = Config::DATA_PATH + username + "/" + dbName;
-    if (!QDir(sourcePath).exists()) {
-        qDebug() << "[Storage] Backup Error: Source database not found.";
+    QDir srcDir(sourcePath);
+    QString absPath = srcDir.absolutePath();
+    qDebug() << "[Storage] backupDatabase: sourcePath=" << sourcePath << "absPath=" << absPath;
+    if (!srcDir.exists()) {
+        qDebug() << "[Storage] Backup Error: Source database not found:" << absPath;
+        qDebug() << "[Storage] currentPath=" << QDir::currentPath();
         return false;
     }
 
@@ -814,23 +851,34 @@ bool StorageManager::restoreDatabase(const QString &username, const QString &dbN
 // 递归拷贝辅助函数
 bool StorageManager::copyDirectory(const QString &srcPath, const QString &dstPath)
 {
-    QDir sourceDir(srcPath);
-    if (!sourceDir.exists()) return false;
+    QString absSrc = QDir(srcPath).absolutePath();
+    QString absDst = QDir(dstPath).absolutePath();
+    qDebug() << "[Storage] copyDirectory:" << absSrc << "->" << absDst;
 
-    QDir destDir(dstPath);
+    QDir sourceDir(absSrc);
+    if (!sourceDir.exists()) {
+        qDebug() << "[Storage] copyDirectory: source not found:" << absSrc;
+        return false;
+    }
+
+    QDir destDir(absDst);
     if (!destDir.exists()) {
-        destDir.mkpath(dstPath);
+        bool ok = destDir.mkpath(absDst);
+        qDebug() << "[Storage] copyDirectory: mkpath" << absDst << "=" << ok;
+        if (!ok) return false;
     }
 
     foreach (QString fileName, sourceDir.entryList(QDir::Files)) {
-        QString srcFilePath = srcPath + "/" + fileName;
-        QString dstFilePath = dstPath + "/" + fileName;
-        if (!QFile::copy(srcFilePath, dstFilePath)) return false;
+        QString srcFilePath = absSrc + "/" + fileName;
+        QString dstFilePath = absDst + "/" + fileName;
+        bool ok = QFile::copy(srcFilePath, dstFilePath);
+        qDebug() << "[Storage] copyDirectory: copy" << fileName << "=" << ok;
+        if (!ok) return false;
     }
 
     foreach (QString subDirName, sourceDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-        QString srcSubPath = srcPath + "/" + subDirName;
-        QString dstSubPath = dstPath + "/" + subDirName;
+        QString srcSubPath = absSrc + "/" + subDirName;
+        QString dstSubPath = absDst + "/" + subDirName;
         if (!copyDirectory(srcSubPath, dstSubPath)) return false;
     }
 

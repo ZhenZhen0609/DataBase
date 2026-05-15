@@ -1,0 +1,293 @@
+=============================================
+          DBMS蓝圈功能测试用例
+=============================================
+
+说明：
+1. 启动程序并登录系统
+2. 选择或创建一个数据库（如 TestDB）
+3. 在SQL终端中依次执行以下测试语句
+
+
+=============================================
+1. 测试外键约束 (Foreign Key Constraint)
+=============================================
+
+-- 步骤1：创建父表（部门表）
+CREATE TABLE departments (
+    dept_id INT PRIMARY KEY,
+    dept_name TEXT
+);
+
+-- 步骤2：创建子表（员工表），带有外键约束
+CREATE TABLE employees (
+    emp_id INT PRIMARY KEY,
+    emp_name TEXT,
+    dept_id INT FOREIGN KEY REFERENCES departments(dept_id) CASCADE
+);
+
+-- 步骤3：插入父表数据
+INSERT INTO departments VALUES (1, 'Engineering');
+INSERT INTO departments VALUES (2, 'Marketing');
+
+-- 步骤4：测试合法外键插入（应该成功）
+INSERT INTO employees VALUES (101, 'Alice', 1);
+
+-- 步骤5：测试非法外键插入（应该失败）
+-- 预期结果：报错 "外键约束失败"
+INSERT INTO employees VALUES (102, 'Bob', 999);
+
+
+=============================================
+2. 测试级联删除 (Cascade Delete)
+=============================================
+
+-- 步骤1：先插入关联数据
+INSERT INTO employees VALUES (103, 'Charlie', 1);
+INSERT INTO employees VALUES (104, 'David', 1);
+
+-- 步骤2：删除部门1（测试CASCADE）
+DELETE FROM departments WHERE dept_id = 1;
+
+-- 步骤3：验证员工表数据
+-- 预期结果：所有属于部门1的员工记录都被自动删除
+SELECT * FROM employees;
+
+
+=============================================
+3. 测试CHECK约束 (CHECK Constraint)
+=============================================
+
+-- 步骤1：创建带CHECK约束的表
+CREATE TABLE students (
+    id INT PRIMARY KEY,
+    name TEXT,
+    age INT CHECK(age > 18)
+);
+
+-- 步骤2：测试合法数据（应该成功）
+INSERT INTO students VALUES (1, 'Tom', 20);
+
+-- 步骤3：测试非法数据（应该失败）
+-- 预期结果：报错 "CHECK约束失败：age > 18"
+INSERT INTO students VALUES (2, 'Jerry', 16);
+
+
+=============================================
+4. 测试格式验证 (Format Validation)
+=============================================
+
+-- 步骤1：创建带格式验证的表
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    email TEXT FORMAT email,
+    phone TEXT FORMAT phone,
+    birthdate TEXT FORMAT date
+);
+
+-- 步骤2：测试合法数据
+INSERT INTO users VALUES (1, 'test@example.com', '13800138000', '2000-01-01');
+
+-- 步骤3：测试非法邮箱（应该失败）
+-- 预期结果：报错 "格式验证失败：不是有效的邮箱地址"
+INSERT INTO users VALUES (2, 'invalid-email', '13800138000', '2000-01-01');
+
+-- 步骤4：测试非法日期（应该失败）
+-- 预期结果：报错 "格式验证失败：不是有效的日期"
+INSERT INTO users VALUES (3, 'test@example.com', '13800138000', '2000/01/01');
+
+
+=============================================
+5. 测试唯一约束 (Unique Constraint)
+=============================================
+
+-- 步骤1：创建带唯一约束的表
+CREATE TABLE unique_test (
+    id INT PRIMARY KEY,
+    username TEXT UNIQUE
+);
+
+-- 步骤2：插入第一条记录
+INSERT INTO unique_test VALUES (1, 'admin');
+
+-- 步骤3：插入重复数据（应该失败）
+-- 预期结果：报错 "唯一约束失败：值已存在"
+INSERT INTO unique_test VALUES (2, 'admin');
+
+
+=============================================
+6. 测试默认值 (Default Value)
+=============================================
+
+-- 步骤1：创建带默认值的表
+CREATE TABLE defaults_test (
+    id INT PRIMARY KEY,
+    status TEXT DEFAULT 'active',
+    count INT DEFAULT 0
+);
+
+-- 步骤2：只插入必填字段
+INSERT INTO defaults_test (id) VALUES (1);
+
+-- 步骤3：查询验证默认值
+-- 预期结果：status='active', count=0
+SELECT * FROM defaults_test;
+
+
+=============================================
+7. 测试数据加密 (Data Encryption)
+=============================================
+
+-- 步骤1：创建带加密字段的表
+CREATE TABLE encrypt_test (
+    id INT PRIMARY KEY,
+    ssn TEXT ENCRYPTED,
+    password TEXT ENCRYPTED
+);
+
+-- 步骤2：插入数据
+INSERT INTO encrypt_test VALUES (1, '123-45-6789', 'secret123');
+
+-- 步骤3：查询数据
+-- 预期结果：数据显示为明文（解密后）
+SELECT * FROM encrypt_test;
+
+
+=============================================
+8. 测试数据导出导入 (Export/Import)
+=============================================
+
+-- 步骤1：创建测试表并插入数据
+CREATE TABLE export_test (
+    id INT PRIMARY KEY,
+    name TEXT,
+    value INT
+);
+INSERT INTO export_test VALUES (1, 'A', 100);
+INSERT INTO export_test VALUES (2, 'B', 200);
+INSERT INTO export_test VALUES (3, 'C', 300);
+
+-- 步骤2：使用UI导出CSV
+-- 在主界面选择 export_test 表，点击「导出」按钮
+
+-- 步骤3：清空表数据
+DELETE FROM export_test WHERE id >= 1;
+
+-- 步骤4：使用UI导入CSV
+-- 点击「导入」按钮，选择刚才保存的CSV文件
+
+
+=============================================
+9. 测试数据库备份恢复 (Backup/Restore)
+=============================================
+
+-- 步骤1：备份当前数据库
+-- 在左侧树状图右键点击数据库名称，选择「备份数据库」
+
+-- 步骤2：删除一些表
+DROP TABLE employees;
+
+-- 步骤3：恢复数据库
+-- 在左侧树状图右键点击数据库名称，选择「恢复数据库」
+
+
+=============================================
+10. 测试非空约束 (NOT NULL Constraint)
+=============================================
+
+-- 步骤1：创建带非空约束的表
+CREATE TABLE notnull_test (
+    id INT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT
+);
+
+-- 步骤2：正常插入（应该成功）
+INSERT INTO notnull_test VALUES (1, 'Alice', 'alice@test.com');
+
+-- 步骤3：不提供 name 字段（应该失败）
+-- 预期结果：报错 "Field 'name' is required"
+INSERT INTO notnull_test (id, email) VALUES (2, 'bob@test.com');
+
+
+=============================================
+11. 测试条件更新 (UPDATE with WHERE)
+=============================================
+
+-- 步骤1：创建测试表并插入数据
+CREATE TABLE update_test (
+    id INT PRIMARY KEY,
+    name TEXT,
+    score INT
+);
+INSERT INTO update_test VALUES (1, 'Alice', 80);
+INSERT INTO update_test VALUES (2, 'Bob', 90);
+INSERT INTO update_test VALUES (3, 'Charlie', 70);
+
+-- 步骤2：条件更新（只更新成绩<85的学生）
+-- 预期结果：Alice(80→85)、Bob(90不变)、Charlie(70→85)
+UPDATE update_test SET score = 85 WHERE score < 85;
+
+-- 步骤3：验证更新结果
+-- 预期结果：Alice=85, Bob=90, Charlie=85
+SELECT * FROM update_test;
+
+-- 步骤4：无条件更新（更新所有记录）
+-- 预期结果：所有 score 变为 100
+UPDATE update_test SET score = 100;
+SELECT * FROM update_test;
+
+
+=============================================
+12. 测试条件删除 (DELETE with WHERE)
+=============================================
+
+-- 步骤1：删除 score < 95 的记录
+-- 当前所有 score 都是 100，所以不删除任何记录
+DELETE FROM update_test WHERE score < 95;
+
+-- 步骤2：验证无记录被删除
+-- 预期结果：3 records
+SELECT * FROM update_test;
+
+-- 步骤3：删除指定记录
+-- 预期结果：删除 id=3
+DELETE FROM update_test WHERE id = 3;
+
+-- 步骤4：验证只剩 2 条记录
+-- 预期结果：只剩余 id=1 和 id=2
+SELECT * FROM update_test;
+
+
+=============================================
+测试预期结果汇总
+=============================================
+
+| 测试项         | 测试操作                  | 预期结果                      |
+|----------------|---------------------------|-------------------------------|
+| 外键约束       | 插入不存在的外键值        | 报错，阻止插入                |
+| 级联删除       | 删除父表记录              | 子表关联记录自动删除          |
+| CHECK约束      | 插入不符合条件的数据      | 报错，阻止插入                |
+| 格式验证       | 插入非法格式数据          | 报错，阻止插入                |
+| 唯一约束       | 插入重复数据              | 报错，阻止插入                |
+| 默认值         | 不提供默认字段值          | 自动填充默认值                |
+| 数据加密       | 插入敏感数据              | 查询时显示明文                |
+| CSV导出        | 导出表数据                | 生成CSV文件                   |
+| CSV导入        | 导入CSV文件               | 数据正确恢复                  |
+| 备份恢复       | 备份后恢复                | 数据库完整恢复                |
+| 非空约束       | 插入NULL或空值到NOT NULL字段 | 报错，阻止插入             |
+| 条件更新       | UPDATE带WHERE更新部分行   | 只更新匹配条件的行            |
+| 条件删除       | DELETE带WHERE删除部分行   | 只删除匹配条件的行            |
+
+
+=============================================
+测试提示
+=============================================
+
+1. 查看日志：所有操作结果都会显示在主界面下方的日志控制台中
+2. 错误提示：约束验证失败时，会显示详细的错误信息
+3. 数据刷新：执行操作后，点击左侧树状图的刷新按钮查看最新数据
+4. 事务支持：可以使用 BEGIN, COMMIT, ROLLBACK 测试事务功能
+
+=============================================
+文件结束
+=============================================

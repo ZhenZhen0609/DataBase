@@ -306,9 +306,13 @@ static QStringList tokenize(const QString &str) {
 }
 
 std::unique_ptr<ConditionNode> ConditionParser::parse(const QString &conditionStr) {
-    // 保存全局token列表和位置，供静态函数使用
     g_tokens = tokenize(conditionStr);
     g_pos = 0;
     if (g_tokens.isEmpty()) return nullptr;
-    return parseExpression();
+    try {
+        return parseExpression();
+    } catch (const std::runtime_error &e) {
+        qDebug() << "[ConditionParser] Parse error:" << e.what();
+        return nullptr;
+    }
 }

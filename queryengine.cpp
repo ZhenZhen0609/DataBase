@@ -1,4 +1,5 @@
 #include "queryengine.h"
+#include "constraintmanager.h"
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonDocument>
@@ -26,7 +27,7 @@ bool QueryEngine::loadTableData(const QString &tableName, QList<Field> &fields, 
         error = res;
         return false;
     }
-    records = res.data.toJsonArray();
+    records = res.data.value<QJsonArray>();
     return true;
 }
 
@@ -91,10 +92,18 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
                                     const QStringList &groupBy, const QString &having,
                                     int limit, int offset, bool distinct)
 {
+    qDebug() << QString("[QueryEngine] executeSelect: table=%1 cols=%2 user=%3 db=%4")
+                .arg(tableName).arg(columns.join(",")).arg(m_currentUser).arg(m_currentDb);
+
     QList<Field> fields;
     QJsonArray records;
     Response err;
-    if (!loadTableData(tableName, fields, records, err)) return err;
+    if (!loadTableData(tableName, fields, records, err)) {
+        qDebug() << QString("[QueryEngine] executeSelect: loadTableData FAILED: %1").arg(err.message);
+        return err;
+    }
+
+    qDebug() << QString("[QueryEngine] executeSelect: loaded %1 fields, %2 raw records").arg(fields.size()).arg(records.size());
 
     // 1. WHERE 过滤
     if (!whereClause.isEmpty()) {
@@ -241,7 +250,10 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
         records = sliced;
     }
 
-    return {ResponseStatus::OK, QString("Selected %1 rows").arg(records.size()), QVariant::fromValue(records)};
+    qDebug() << QString("[QueryEngine] executeSelect: returning %1 rows").arg(records.size());
+    QJsonDocument resultDoc(records);
+    QString jsonStr = QString::fromUtf8(resultDoc.toJson(QJsonDocument::Compact));
+    return {ResponseStatus::OK, QString("Selected %1 rows").arg(records.size()), QVariant(jsonStr)};
 }
 
 Response QueryEngine::executeInsert(const QString &tableName, const QStringList &colNames,
@@ -275,63 +287,256 @@ Response QueryEngine::executeInsert(const QString &tableName, const QStringList 
 Response QueryEngine::executeUpdate(const QString &tableName, const QJsonObject &assignments,
                                     const QString &whereClause)
 {
-    QList<Field> fields;
-    QJsonArray records;
-    Response err;
-    if (!loadTableData(tableName, fields, records, err)) return err;
+    qDebug() << "[UPDATE] START: table=" << tableName << " user=" << m_currentUser << " db=" << m_currentDb;
 
-    std::unique_ptr<ConditionNode> cond;
-    if (!whereClause.isEmpty()) {
-        cond = ConditionParser::parse(whereClause);
-        if (!cond) return {ResponseStatus::ERROR, "Failed to parse WHERE clause", QVariant()};
+    StorageManager storage;
+    QList<Field> fields = storage.loadTableSchema(m_currentUser, m_currentDb, tableName);
+    if (fields.isEmpty()) {
+        return {ResponseStatus::TABLE_NOT_FOUND, "Table not found: " + tableName, QVariant()};
     }
 
+    QString pkField = "id";
+    for (const Field &f : fields) {
+        if (f.isPrimaryKey) { pkField = f.name; break; }
+    }
+
+    QByteArray raw = storage.readTableData(m_currentUser, m_currentDb, tableName);
+    QJsonArray allRecords;
+    {
+        QDataStream ds(&raw, QIODevice::ReadOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        while (!ds.atEnd()) {
+            qint64 sz = 0;
+            if (ds.readRawData(reinterpret_cast<char*>(&sz), sizeof(qint64)) != sizeof(qint64)) break;
+            QByteArray chunk(sz, 0);
+            if (ds.readRawData(chunk.data(), sz) != sz) break;
+            QDataStream rs(&chunk, QIODevice::ReadOnly);
+            rs.setByteOrder(QDataStream::LittleEndian);
+            int fc; rs >> fc;
+            QJsonObject obj;
+            for (const Field &f : fields) {
+                switch (f.type) {
+                case FieldType::INT:    { int v;    rs >> v; obj[f.name] = v; break; }
+                case FieldType::DOUBLE: { double v; rs >> v; obj[f.name] = v; break; }
+                case FieldType::BOOLEAN:{ bool v;   rs >> v; obj[f.name] = v; break; }
+                case FieldType::TEXT:   { QString v;rs >> v; obj[f.name] = v; break; }
+                }
+            }
+            QString ca; rs >> ca; obj["_created_at"] = ca;
+            for (const Field &f : fields) {
+                if (f.isEncrypted && obj.contains(f.name))
+                    obj[f.name] = ConstraintManager::decrypt(obj[f.name].toString());
+            }
+            allRecords.append(obj);
+        }
+    }
+
+    qDebug() << "[UPDATE] loaded" << allRecords.size() << "records";
+
+    std::unique_ptr<ConditionNode> cond;
+    if (!whereClause.trimmed().isEmpty()) {
+        cond = ConditionParser::parse(whereClause.trimmed());
+        if (!cond) return {ResponseStatus::ERROR, "WHERE parse failed: " + whereClause, QVariant()};
+    }
+
+    QList<QJsonObject> finalRecords;
+    QStringList updatedPks;
     int count = 0;
-    for (int i = 0; i < records.size(); ++i) {
-        QJsonObject obj = records[i].toObject();
+
+    for (const QJsonValue &v : allRecords) {
+        QJsonObject obj = v.toObject();
         if (!cond || cond->evaluate(obj, fields)) {
             for (const QString &key : assignments.keys()) {
                 obj[key] = assignments[key];
             }
-            records[i] = obj;
+            updatedPks.append(obj[pkField].toVariant().toString());
             count++;
         }
+        finalRecords.append(obj);
     }
+
+    qDebug() << "[UPDATE] updated" << count << "records";
 
     if (count == 0) return {ResponseStatus::OK, "No rows updated", QVariant()};
 
-    Response wres = rewriteTable(tableName, records, fields);
-    if (wres.status != ResponseStatus::OK) return wres;
+    for (const QString &pk : updatedPks) {
+        ConstraintManager::cascadeUpdate(m_currentUser, m_currentDb, tableName, pk, assignments);
+    }
+
+    QByteArray newData;
+    {
+        QDataStream ds(&newData, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        for (const QJsonObject &obj : finalRecords) {
+            QJsonObject encObj = obj;
+            for (const Field &f : fields) {
+                if (f.isEncrypted && encObj.contains(f.name))
+                    encObj[f.name] = ConstraintManager::encrypt(encObj[f.name].toString());
+            }
+            QByteArray chunk;
+            QDataStream rs(&chunk, QIODevice::WriteOnly);
+            rs.setByteOrder(QDataStream::LittleEndian);
+            int fcount = fields.size();
+            rs << fcount;
+            for (const Field &f : fields) {
+                QJsonValue val = encObj.value(f.name);
+                switch (f.type) {
+                case FieldType::INT:    rs << val.toInt(); break;
+                case FieldType::DOUBLE: rs << val.toDouble(); break;
+                case FieldType::BOOLEAN:rs << val.toBool(); break;
+                case FieldType::TEXT:   rs << val.toString(); break;
+                }
+            }
+            rs << obj["_created_at"].toString();
+            qint64 s = chunk.size();
+            ds.writeRawData(reinterpret_cast<const char*>(&s), sizeof(qint64));
+            ds.writeRawData(chunk.data(), s);
+        }
+    }
+
+    storage.writeTableData(m_currentUser, m_currentDb, tableName, newData);
+    qDebug() << "[UPDATE] DONE, wrote" << finalRecords.size() << "records";
     return {ResponseStatus::OK, QString("Updated %1 rows").arg(count), QVariant()};
 }
 
 Response QueryEngine::executeDelete(const QString &tableName, const QString &whereClause)
 {
-    QList<Field> fields;
-    QJsonArray records;
-    Response err;
-    if (!loadTableData(tableName, fields, records, err)) return err;
+    qDebug() << "========================================";
+    qDebug() << "[DELETE] START: table=" << tableName << "user=" << m_currentUser << "db=" << m_currentDb;
+    qDebug() << "[DELETE] WHERE raw=[" << whereClause << "]";
 
-    std::unique_ptr<ConditionNode> cond;
-    if (!whereClause.isEmpty()) {
-        cond = ConditionParser::parse(whereClause);
-        if (!cond) return {ResponseStatus::ERROR, "Failed to parse WHERE clause", QVariant()};
+    StorageManager storage;
+
+    QList<Field> fields = storage.loadTableSchema(m_currentUser, m_currentDb, tableName);
+    if (fields.isEmpty()) {
+        qDebug() << "[DELETE] FAIL: unknown table";
+        return {ResponseStatus::TABLE_NOT_FOUND, "Table not found: " + tableName, QVariant()};
     }
 
-    QJsonArray remaining;
-    int count = 0;
-    for (const auto &val : records) {
-        QJsonObject obj = val.toObject();
-        if (cond && cond->evaluate(obj, fields)) {
-            count++;
-        } else {
-            remaining.append(obj);
+    QString pkField = "id";
+    for (const Field &f : fields) {
+        if (f.isPrimaryKey) { pkField = f.name; break; }
+    }
+    qDebug() << "[DELETE] pkField=" << pkField << " fields=" << fields.size();
+
+    QByteArray raw = storage.readTableData(m_currentUser, m_currentDb, tableName);
+    QJsonArray allRecords;
+    {
+        QDataStream ds(&raw, QIODevice::ReadOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        while (!ds.atEnd()) {
+            qint64 sz = 0;
+            if (ds.readRawData(reinterpret_cast<char*>(&sz), sizeof(qint64)) != sizeof(qint64)) break;
+            QByteArray chunk(sz, 0);
+            if (ds.readRawData(chunk.data(), sz) != sz) break;
+            QDataStream rs(&chunk, QIODevice::ReadOnly);
+            rs.setByteOrder(QDataStream::LittleEndian);
+            int fc; rs >> fc;
+            QJsonObject obj;
+            for (const Field &f : fields) {
+                switch (f.type) {
+                case FieldType::INT:    { int v;    rs >> v; obj[f.name] = v; break; }
+                case FieldType::DOUBLE: { double v; rs >> v; obj[f.name] = v; break; }
+                case FieldType::BOOLEAN:   { bool v;   rs >> v; obj[f.name] = v; break; }
+                case FieldType::TEXT:   { QString v;rs >> v; obj[f.name] = v; break; }
+                }
+            }
+            QString ca; rs >> ca; obj["_created_at"] = ca;
+
+            for (const Field &f : fields) {
+                if (f.isEncrypted && obj.contains(f.name)) {
+                    obj[f.name] = ConstraintManager::decrypt(obj[f.name].toString());
+                }
+            }
+
+            allRecords.append(obj);
+        }
+    }
+    qDebug() << "[DELETE] loaded" << allRecords.size() << "records from disk";
+    for (int i = 0; i < allRecords.size(); ++i) {
+        QJsonObject r = allRecords[i].toObject();
+        qDebug() << "[DELETE]   rec[" << i << "] pk=" << r[pkField].toVariant().toString();
+    }
+
+    QList<QJsonObject> remaining;
+    QStringList deletedPks;
+
+    if (whereClause.trimmed().isEmpty()) {
+        qDebug() << "[DELETE] WARNING: no WHERE clause, deleting ALL";
+        for (const QJsonValue &v : allRecords) {
+            deletedPks.append(v.toObject()[pkField].toVariant().toString());
+        }
+    } else {
+        auto cond = ConditionParser::parse(whereClause.trimmed());
+        if (!cond) {
+            qDebug() << "[DELETE] FAIL: WHERE parse error";
+            return {ResponseStatus::ERROR, "WHERE parse failed: " + whereClause, QVariant()};
+        }
+
+        for (const QJsonValue &v : allRecords) {
+            QJsonObject obj = v.toObject();
+            bool hit = cond->evaluate(obj, fields);
+            QString pk = obj[pkField].toVariant().toString();
+            qDebug() << "[DELETE] eval pk=" << pk << " => match=" << hit;
+            if (hit) {
+                deletedPks.append(pk);
+            } else {
+                remaining.append(obj);
+            }
         }
     }
 
-    if (count == 0) return {ResponseStatus::OK, "No rows deleted", QVariant()};
+    qDebug() << "[DELETE] toDelete=" << deletedPks.size() << " remaining=" << remaining.size();
 
-    Response wres = rewriteTable(tableName, remaining, fields);
-    if (wres.status != ResponseStatus::OK) return wres;
-    return {ResponseStatus::OK, QString("Deleted %1 rows").arg(count), QVariant()};
+    if (deletedPks.isEmpty()) {
+        qDebug() << "[DELETE] DONE: nothing to delete";
+        return {ResponseStatus::OK, "No rows deleted", QVariant()};
+    }
+
+    for (const QString &pk : deletedPks) {
+        qDebug() << "[DELETE] cascading for pk=" << pk;
+        ConstraintManager::cascadeDelete(m_currentUser, m_currentDb, tableName, pk);
+    }
+
+    QByteArray newData;
+    {
+        QDataStream ds(&newData, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        for (const QJsonObject &obj : remaining) {
+            QJsonObject encObj = obj;
+            for (const Field &f : fields) {
+                if (f.isEncrypted && encObj.contains(f.name)) {
+                    encObj[f.name] = ConstraintManager::encrypt(encObj[f.name].toString());
+                }
+            }
+
+            QByteArray chunk;
+            QDataStream rs(&chunk, QIODevice::WriteOnly);
+            rs.setByteOrder(QDataStream::LittleEndian);
+            int fcount = fields.size();
+            rs << fcount;
+            for (const Field &f : fields) {
+                QJsonValue val = encObj.value(f.name);
+                switch (f.type) {
+                case FieldType::INT:    rs << val.toInt(); break;
+                case FieldType::DOUBLE: rs << val.toDouble(); break;
+                case FieldType::BOOLEAN:   rs << val.toBool(); break;
+                case FieldType::TEXT:   rs << val.toString(); break;
+                }
+            }
+            rs << obj["_created_at"].toString();
+            qint64 s = chunk.size();
+            ds.writeRawData(reinterpret_cast<const char*>(&s), sizeof(qint64));
+            ds.writeRawData(chunk.data(), s);
+        }
+    }
+
+    bool ok = storage.writeTableData(m_currentUser, m_currentDb, tableName, newData);
+    qDebug() << "[DELETE] wrote" << remaining.size() << "records, ok=" << ok;
+    qDebug() << "========================================";
+
+    if (!ok) {
+        return {ResponseStatus::ERROR, "Write failed", QVariant()};
+    }
+    return {ResponseStatus::OK, QString("Deleted %1 rows").arg(deletedPks.size()), QVariant()};
 }

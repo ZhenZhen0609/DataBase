@@ -33,6 +33,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         lockmanager.h lockmanager.cpp
         queryengine.h queryengine.cpp
         conditionparser.h conditionparser.cpp
+        constraintmanager.h constraintmanager.cpp
+        datamigrator.h datamigrator.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET DBMS APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
