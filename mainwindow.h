@@ -14,6 +14,7 @@
 #include "storagemanager.h"
 #include "sqlparser.h"
 #include "queryengine.h"
+#include "datamigrator.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -66,6 +67,9 @@ private slots:
     void onTableHeaderClicked(int column);
     void onImportCSV();
     void onImportJSON();
+    void onExportCSV();
+    void onBackupDatabase();
+    void onRestoreDatabase();
 
     // 功能4新增: 可视化看板
     void onShowChart();
@@ -84,6 +88,7 @@ private:
     StorageManager *m_storage;
     SQLParser     *m_parser;
     QueryEngine   *m_queryEngine;
+    DataMigrator  *m_migrator;
     SqlHighlighter *m_sqlHighlighter;
 
     QString m_currentUser;

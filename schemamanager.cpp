@@ -89,6 +89,17 @@ QByteArray SchemaManager::serializeSchema(const QList<Field> &fields) const
         fieldObj["length"] = field.length;
         fieldObj["isNotNull"] = field.isNotNull;
         fieldObj["isPrimaryKey"] = field.isPrimaryKey;
+        fieldObj["isUnique"] = field.isUnique;
+        fieldObj["hasCheck"] = field.hasCheck;
+        fieldObj["checkExpr"] = field.checkExpr;
+        fieldObj["defaultValue"] = field.defaultValue;
+        fieldObj["hasIndex"] = field.hasIndex;
+        fieldObj["isForeignKey"] = field.isForeignKey;
+        fieldObj["referenceTable"] = field.referenceTable;
+        fieldObj["referenceField"] = field.referenceField;
+        fieldObj["cascadeRule"] = field.cascadeRule;
+        fieldObj["formatValidation"] = field.formatValidation;
+        fieldObj["isEncrypted"] = field.isEncrypted;
         fieldsArray.append(fieldObj);
     }
     QJsonObject root;

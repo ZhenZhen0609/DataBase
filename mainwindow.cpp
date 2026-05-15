@@ -32,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_storage(new StorageManager())
     , m_parser(new SQLParser(this))
     , m_queryEngine(new QueryEngine(this))
+    , m_migrator(new DataMigrator())
 {
     ui->setupUi(this);
 
@@ -63,6 +64,23 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnImportCSV, &QPushButton::clicked, this, &MainWindow::onImportCSV);
     connect(ui->btnImportJSON, &QPushButton::clicked, this, &MainWindow::onImportJSON);
     connect(ui->tableData->horizontalHeader(), &QHeaderView::sectionClicked, this, &MainWindow::onTableHeaderClicked);
+
+    // 蓝圈功能: 导出CSV按钮 (动态添加到dataToolbarLayout)
+    QPushButton *btnExportCSV = new QPushButton("📤 导出CSV", this);
+    btnExportCSV->setObjectName("btnExportCSV");
+    ui->dataToolbarLayout->addWidget(btnExportCSV);
+    connect(btnExportCSV, &QPushButton::clicked, this, &MainWindow::onExportCSV);
+
+    // 蓝圈功能: 备份/恢复数据库按钮 (动态添加到sidebarLayout)
+    QPushButton *btnBackupDb = new QPushButton("💾 备份数据库", this);
+    btnBackupDb->setObjectName("btnBackupDb");
+    ui->sidebarLayout->addWidget(btnBackupDb);
+    connect(btnBackupDb, &QPushButton::clicked, this, &MainWindow::onBackupDatabase);
+
+    QPushButton *btnRestoreDb = new QPushButton("📥 恢复数据库", this);
+    btnRestoreDb->setObjectName("btnRestoreDb");
+    ui->sidebarLayout->addWidget(btnRestoreDb);
+    connect(btnRestoreDb, &QPushButton::clicked, this, &MainWindow::onRestoreDatabase);
 
     // 功能4新增: 统计图表
     connect(ui->btnShowChart, &QPushButton::clicked, this, &MainWindow::onShowChart);
@@ -575,32 +593,12 @@ void MainWindow::onInsertRecord()
         else record[f.name] = val;
     }
 
-    // 读取现有记录
-    QString trdPath = Config::DATA_PATH + m_currentUser + "/" + m_currentDb + "/" + m_currentTable + ".trd";
-    QFile file(trdPath);
-    QJsonArray records;
-    if (file.open(QIODevice::ReadOnly)) {
-        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-        if (doc.isArray()) records = doc.array();
-        file.close();
-    }
-
-    // 验证并插入
-    Response res = m_schema->validateAndFillRecord(
-        TableSchema{m_currentTable, fields}, records, record);
+    Response res = m_record->insertRecord(m_currentUser, m_currentDb, m_currentTable, record);
     if (res.status != ResponseStatus::OK) {
         log("插入失败: " + res.message);
-        return;
-    }
-
-    records.append(record);
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write(QJsonDocument(records).toJson());
-        file.close();
+    } else {
         log("记录插入成功");
         onRefreshData();
-    } else {
-        log("写入失败");
     }
 }
 
@@ -665,8 +663,16 @@ void MainWindow::onExecuteSQL()
     if (res.status == ResponseStatus::OK) {
         refreshTree();
 
-        if (res.data.canConvert<QJsonArray>()) {
-            QJsonArray records = res.data.value<QJsonArray>();
+        QJsonArray records;
+        {
+            QString jsonStr = res.data.toString();
+            if (!jsonStr.isEmpty()) {
+                QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8());
+                records = doc.array();
+            }
+        }
+        qDebug() << QString("[UI] onExecuteSQL: got %1 records, empty=%2").arg(records.size()).arg(records.isEmpty());
+        if (!records.isEmpty()) {
             m_totalRows = records.size();
 
             int offset = m_currentPage * m_pageSize;
@@ -674,11 +680,6 @@ void MainWindow::onExecuteSQL()
 
             ui->tableSQLResult->clear();
             ui->tableSQLResult->setRowCount(0);
-
-            if (records.isEmpty()) {
-                updatePaginationLabel();
-                return;
-            }
 
             QStringList cols;
             for (const QJsonValue &v : records) {
@@ -833,6 +834,16 @@ void MainWindow::onTreeItemContextMenu(const QPoint &pos)
         connect(newTableAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
         newTableAction->setData(QVariant::fromValue(QPair<QString, QString>("create_table", dbName)));
 
+        QAction *backupAction = menu.addAction("备份数据库");
+        connect(backupAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
+        backupAction->setData(QVariant::fromValue(QPair<QString, QString>("backup_database", dbName)));
+
+        QAction *restoreAction = menu.addAction("恢复数据库");
+        connect(restoreAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
+        restoreAction->setData(QVariant::fromValue(QPair<QString, QString>("restore_database", dbName)));
+
+        menu.addSeparator();
+
         QAction *dropDbAction = menu.addAction("删除数据库");
         connect(dropDbAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
         dropDbAction->setData(QVariant::fromValue(QPair<QString, QString>("drop_database", dbName)));
@@ -842,6 +853,10 @@ void MainWindow::onTreeItemContextMenu(const QPoint &pos)
         QString tableName = item->text(0);
         m_currentDb = dbName;
         m_currentTable = tableName;
+
+        QAction *exportAction = menu.addAction("导出CSV");
+        connect(exportAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
+        exportAction->setData(QVariant::fromValue(QPair<QString, QString>("export_csv", tableName)));
 
         QAction *dropTableAction = menu.addAction("删除表");
         connect(dropTableAction, &QAction::triggered, this, &MainWindow::onContextMenuAction);
@@ -900,6 +915,12 @@ void MainWindow::onContextMenuAction()
                 QMessageBox::warning(this, "删除失败", r.message);
             }
         }
+    } else if (actionType == "export_csv") {
+        onExportCSV();
+    } else if (actionType == "backup_database") {
+        onBackupDatabase();
+    } else if (actionType == "restore_database") {
+        onRestoreDatabase();
     }
 }
 
@@ -1293,6 +1314,84 @@ void MainWindow::onImportJSON()
 
     log(QString("[导入JSON] 成功导入 %1 条记录").arg(count));
     showDataTable(m_currentUser, m_currentDb, m_currentTable);
+}
+
+void MainWindow::onExportCSV()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(this, "导出CSV", m_currentTable + ".csv", "CSV文件 (*.csv)");
+    if (fileName.isEmpty()) return;
+
+    Response res = m_migrator->exportToCSV(m_currentUser, m_currentDb, m_currentTable, fileName);
+    log(res.message);
+}
+
+void MainWindow::onBackupDatabase()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty()) {
+        log("[UI] 请先选中一个数据库");
+        return;
+    }
+
+    Response res = m_migrator->backupDatabase(m_currentUser, m_currentDb, "");
+    log(res.message);
+    if (res.status == ResponseStatus::OK) {
+        refreshTree();
+    }
+}
+
+void MainWindow::onRestoreDatabase()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty()) {
+        log("[UI] 请先选中一个数据库");
+        return;
+    }
+
+    // 列出可用的备份
+    QString dataPath = Config::DATA_PATH + m_currentUser + "/";
+    QDir dataDir(dataPath);
+    QStringList backupDirs;
+    QStringList entries = dataDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &entry : entries) {
+        if (entry.startsWith(m_currentDb + "_backup_")) {
+            backupDirs.append(entry);
+        }
+    }
+
+    if (backupDirs.isEmpty()) {
+        QMessageBox::information(this, "恢复数据库",
+                                 QString("未找到数据库 \"%1\" 的备份。\n请先备份数据库。").arg(m_currentDb));
+        return;
+    }
+
+    // 让用户选择备份
+    bool ok;
+    QString chosen = QInputDialog::getItem(this, "恢复数据库",
+                                           QString("选择要恢复的备份:"), backupDirs, 0, false, &ok);
+    if (!ok || chosen.isEmpty()) return;
+
+    int ret = QMessageBox::question(this, "确认恢复",
+                                    QString("确定要从备份 \"%1\" 恢复数据库 \"%2\" 吗？\n当前数据将被覆盖！")
+                                        .arg(chosen).arg(m_currentDb));
+    if (ret != QMessageBox::Yes) return;
+
+    Response res = m_migrator->restoreDatabase(m_currentUser, m_currentDb, chosen);
+    log(res.message);
+    if (res.status == ResponseStatus::OK) {
+        refreshTree();
+        m_currentTable.clear();
+        ui->tableData->clearContents();
+        ui->tableData->setRowCount(0);
+        ui->tableSchema->clearContents();
+        ui->tableSchema->setRowCount(0);
+    }
 }
 
 void MainWindow::onShowChart()

@@ -27,11 +27,18 @@ struct Field {
     QString checkExpr; // CHECK约束表达式
     QString defaultValue; // 默认值
     bool hasIndex;     // 是否有索引
+    bool isForeignKey; // 是否为外键
+    QString referenceTable; // 引用表名
+    QString referenceField; // 引用字段名
+    QString cascadeRule; // 级联规则（CASCADE/SET NULL/RESTRICT）
+    QString formatValidation; // 格式验证类型（email/date/phone等）
+    bool isEncrypted; // 是否加密存储
 
     // 构造函数，方便初始化
     Field(QString n="", FieldType t=FieldType::TEXT, int l=255)
         : name(n), type(t), length(l), isNotNull(false), isPrimaryKey(false),
-          isUnique(false), hasCheck(false), hasIndex(false) {}
+          isUnique(false), hasCheck(false), hasIndex(false), isForeignKey(false),
+          isEncrypted(false) {}
 };
 
 //表结构定义

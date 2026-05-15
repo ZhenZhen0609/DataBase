@@ -32,6 +32,7 @@ private:
     QueryEngine *m_engine = nullptr;
 
     // 内部解析辅助
+    Response parseSingleStatement(const QString &sql);
     Response execCreateDatabase(const QString &dbName);
     Response execCreateTable(const QString &tableName, const QString &fieldsStr);
     Response execDropDatabase(const QString &dbName);
