@@ -473,7 +473,7 @@ QList<QPair<QString, Field>> ConstraintManager::findAllReferencingFields(const Q
 {
     QList<QPair<QString, Field>> result;
 
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     qDebug() << QString("[Constraint] findAllReferencingFields: Searching in path %1 for refs to %2").arg(dbPath).arg(refTableName);
 
     QDir dir(dbPath);

@@ -85,6 +85,12 @@ MainWindow::MainWindow(QWidget *parent)
     // 功能4新增: 统计图表
     connect(ui->btnShowChart, &QPushButton::clicked, this, &MainWindow::onShowChart);
 
+    // 功能5新增: 表格直接编辑
+    connect(ui->btnAddRow, &QPushButton::clicked, this, &MainWindow::onAddRow);
+    connect(ui->btnSaveTable, &QPushButton::clicked, this, &MainWindow::onSaveTableChanges);
+    connect(ui->btnDeleteRow, &QPushButton::clicked, this, &MainWindow::onDeleteSelectedRow);
+    connect(ui->tableData, &QTableWidget::cellChanged, this, &MainWindow::onTableCellChanged);
+
     // SQL执行按钮
     connect(ui->btnExecuteSQL, &QPushButton::clicked, this, &MainWindow::onExecuteSQL);
 
@@ -146,7 +152,7 @@ void MainWindow::refreshTree()
     ui->dbTree->clear();
     if (m_currentUser.isEmpty()) return;
 
-    QString userPath = Config::DATA_PATH + m_currentUser;
+    QString userPath = Config::dataPath() + m_currentUser;
     QDir userDir(userPath);
     if (!userDir.exists()) return;
 
@@ -543,6 +549,23 @@ void MainWindow::onRefreshData()
         log("请先选择表");
         return;
     }
+    
+    if (m_isEditing) {
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            this, "未保存的修改",
+            "当前有未保存的修改，是否保存？",
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+        
+        if (reply == QMessageBox::Save) {
+            onSaveTableChanges();
+            return;
+        } else if (reply == QMessageBox::Cancel) {
+            return;
+        } else {
+            m_isEditing = false;
+        }
+    }
+    
     showDataTable(m_currentUser, m_currentDb, m_currentTable);
 }
 
@@ -598,7 +621,8 @@ void MainWindow::onInsertRecord()
         log("插入失败: " + res.message);
     } else {
         log("记录插入成功");
-        onRefreshData();
+        m_isEditing = false;
+        showDataTable(m_currentUser, m_currentDb, m_currentTable);
     }
 }
 
@@ -662,6 +686,16 @@ void MainWindow::onExecuteSQL()
 
     if (res.status == ResponseStatus::OK) {
         refreshTree();
+
+        QString sqlUpper = sql.toUpper().trimmed();
+        if (sqlUpper.startsWith("INSERT") || sqlUpper.startsWith("UPDATE") || 
+            sqlUpper.startsWith("DELETE") || sqlUpper.startsWith("CREATE TABLE") ||
+            sqlUpper.startsWith("DROP")) {
+            if (!m_currentDb.isEmpty() && !m_currentTable.isEmpty()) {
+                m_isEditing = false;
+                showDataTable(m_currentUser, m_currentDb, m_currentTable);
+            }
+        }
 
         QJsonArray records;
         {
@@ -727,11 +761,15 @@ void MainWindow::showDataTable(const QString &username, const QString &dbName, c
     }
 
     QJsonArray records = res.data.value<QJsonArray>();
+    m_originalData = records;
+
     ui->tableData->setRowCount(records.size());
     for (int i = 0; i < records.size(); ++i) {
         QJsonObject rec = records[i].toObject();
         for (int j = 0; j < fields.size(); ++j) {
-            ui->tableData->setItem(i, j, new QTableWidgetItem(rec[fields[j].name].toVariant().toString()));
+            QTableWidgetItem *item = new QTableWidgetItem(rec[fields[j].name].toVariant().toString());
+            item->setFlags(item->flags() | Qt::ItemIsEditable);
+            ui->tableData->setItem(i, j, item);
         }
     }
 }
@@ -744,7 +782,7 @@ void MainWindow::showSchemaTable(const QString &username, const QString &dbName,
     ui->tableSchema->setHorizontalHeaderLabels({"字段名", "类型", "长度", "非空", "主键", "约束", "索引"});
     ui->tableSchema->setRowCount(fields.size());
 
-    QString tidPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".tid";
+    QString tidPath = Config::dataPath() + username + "/" + dbName + "/" + tableName + ".tid";
     QFile tidFile(tidPath);
     QStringList indexedFields;
     if (tidFile.open(QIODevice::ReadOnly)) {
@@ -1165,15 +1203,31 @@ void MainWindow::onTableHeaderClicked(int column)
                   .arg(m_sortOrder == Qt::AscendingOrder ? "ASC" : "DESC");
     }
 
+    qDebug() << "[Sort] SQL:" << sql;
     Response res = m_parser->parseSQL(sql);
+    qDebug() << "[Sort] Result status:" << (int)res.status << "message:" << res.message;
     log(QString("[排序] 按 %1 %2").arg(sortField).arg(m_sortOrder == Qt::AscendingOrder ? "升序" : "降序"));
 
     ui->tableData->clearContents();
     ui->tableData->setRowCount(0);
 
-    if (res.status != ResponseStatus::OK || !res.data.canConvert<QJsonArray>()) return;
+    if (res.status != ResponseStatus::OK) {
+        log("排序失败: " + res.message);
+        return;
+    }
 
-    QJsonArray records = res.data.value<QJsonArray>();
+    QJsonArray records;
+    QString jsonStr = res.data.toString();
+    qDebug() << "[Sort] JSON data:" << jsonStr.left(200);
+    if (!jsonStr.isEmpty()) {
+        QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8());
+        records = doc.array();
+    }
+
+    if (records.isEmpty()) {
+        log("排序结果为空");
+        return;
+    }
 
     QStringList cols;
     for (const Field &f : fields) cols << f.name;
@@ -1190,9 +1244,13 @@ void MainWindow::onTableHeaderClicked(int column)
             if (val.isBool())        text = val.toBool() ? "true" : "false";
             else if (val.isDouble()) text = QString::number(val.toDouble());
             else                     text = val.toString();
-            ui->tableData->setItem(row, col, new QTableWidgetItem(text));
+            QTableWidgetItem *item = new QTableWidgetItem(text);
+            item->setFlags(item->flags() | Qt::ItemIsEditable);
+            ui->tableData->setItem(row, col, item);
         }
     }
+    
+    ui->tableData->horizontalHeader()->setSortIndicator(column, m_sortOrder);
 }
 
 void MainWindow::onImportCSV()
@@ -1355,7 +1413,7 @@ void MainWindow::onRestoreDatabase()
     }
 
     // 列出可用的备份
-    QString dataPath = Config::DATA_PATH + m_currentUser + "/";
+    QString dataPath = Config::dataPath() + m_currentUser + "/";
     QDir dataDir(dataPath);
     QStringList backupDirs;
     QStringList entries = dataDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
@@ -1570,4 +1628,109 @@ void MainWindow::onShowChart()
     connect(closeBtn, &QDialogButtonBox::rejected, &resultDialog, &QDialog::reject);
 
     resultDialog.exec();
+}
+
+void MainWindow::onAddRow()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (fields.isEmpty()) {
+        log("[新增行] 无法加载表结构");
+        return;
+    }
+
+    int newRow = ui->tableData->rowCount();
+    ui->tableData->insertRow(newRow);
+
+    for (int j = 0; j < fields.size(); ++j) {
+        QTableWidgetItem *item = new QTableWidgetItem("");
+        item->setFlags(item->flags() | Qt::ItemIsEditable);
+        ui->tableData->setItem(newRow, j, item);
+    }
+
+    m_isEditing = true;
+    log("[新增行] 已添加新行，编辑后点击'保存修改'");
+}
+
+void MainWindow::onTableCellChanged(int row, int column)
+{
+    Q_UNUSED(row);
+    Q_UNUSED(column);
+    m_isEditing = true;
+}
+
+void MainWindow::onSaveTableChanges()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDb, m_currentTable);
+    if (fields.isEmpty()) {
+        log("[保存修改] 无法加载表结构");
+        return;
+    }
+
+    QJsonArray newRecords;
+    for (int i = 0; i < ui->tableData->rowCount(); ++i) {
+        QJsonObject rec;
+        for (int j = 0; j < fields.size(); ++j) {
+            QString valStr = ui->tableData->item(i, j) ? ui->tableData->item(i, j)->text() : "";
+            
+            switch (fields[j].type) {
+                case FieldType::INT:
+                    rec[fields[j].name] = valStr.toInt();
+                    break;
+                case FieldType::DOUBLE:
+                    rec[fields[j].name] = valStr.toDouble();
+                    break;
+                case FieldType::BOOLEAN:
+                    rec[fields[j].name] = (valStr.toLower() == "true" || valStr == "1");
+                    break;
+                default:
+                    rec[fields[j].name] = valStr;
+                    break;
+            }
+        }
+        newRecords.append(rec);
+    }
+
+    Response res = m_record->replaceAllRecords(m_currentUser, m_currentDb, m_currentTable, newRecords);
+    if (res.status == ResponseStatus::OK) {
+        log(QString("[保存修改] 成功保存 %1 条记录").arg(newRecords.size()));
+        m_isEditing = false;
+        showDataTable(m_currentUser, m_currentDb, m_currentTable);
+    } else {
+        log("[保存修改] 失败: " + res.message);
+    }
+}
+
+void MainWindow::onDeleteSelectedRow()
+{
+    if (!m_loggedIn) { requireLogin(); return; }
+    if (m_currentDb.isEmpty() || m_currentTable.isEmpty()) {
+        log("[UI] 请先选中一张表");
+        return;
+    }
+
+    int currentRow = ui->tableData->currentRow();
+    if (currentRow < 0) {
+        log("[删除行] 请先选择要删除的行");
+        return;
+    }
+
+    if (QMessageBox::question(this, "确认删除", QString("确定删除第 %1 行？").arg(currentRow + 1)) != QMessageBox::Yes) {
+        return;
+    }
+
+    ui->tableData->removeRow(currentRow);
+    m_isEditing = true;
+    log(QString("[删除行] 已删除第 %1 行，点击'保存修改'生效").arg(currentRow + 1));
 }

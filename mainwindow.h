@@ -74,6 +74,12 @@ private slots:
     // 功能4新增: 可视化看板
     void onShowChart();
 
+    // 功能5新增: 表格直接编辑
+    void onAddRow();
+    void onTableCellChanged(int row, int column);
+    void onSaveTableChanges();
+    void onDeleteSelectedRow();
+
     void onTreeItemClicked(QTreeWidgetItem *item, int column);
     void onTreeItemContextMenu(const QPoint &pos);
     void onContextMenuAction();
@@ -106,6 +112,10 @@ private:
     // 功能2新增: 排序状态
     int m_sortColumn = -1;
     Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
+
+    // 功能5新增: 表格编辑状态
+    QJsonArray m_originalData;
+    bool m_isEditing = false;
 
     QElapsedTimer m_queryTimer;
 

@@ -67,14 +67,11 @@ struct Response {
 
 // 全局常量配置
 namespace Config {
-// 返回 data 目录的绝对路径，末尾带一个斜杠
-inline const QString& dataPath() {
-    static QString path = QDir(QCoreApplication::applicationDirPath() + "/../data/").absolutePath() + "/";
+inline QString dataPath() {
+    QString appDir = QCoreApplication::applicationDirPath();
+    QString path = QDir(appDir + "/../data/").absolutePath() + "/";
     return path;
 }
-
-// 为了兼容旧代码，提供一个常量引用 DATA_PATH
-inline const QString& DATA_PATH = dataPath();
 
 const QString USER_FILE = "users.json";
 }

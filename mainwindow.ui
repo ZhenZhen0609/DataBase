@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1200</width>
+    <width>1449</width>
     <height>800</height>
    </rect>
   </property>
@@ -228,12 +228,8 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
-    <!-- 顶部工具栏 -->
     <item>
      <widget class="QWidget" name="topToolbar" native="true">
-      <property name="minimumHeight">
-       <number>60</number>
-      </property>
       <layout class="QHBoxLayout" name="topToolbarLayout">
        <property name="leftMargin">
         <number>16</number>
@@ -249,27 +245,26 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
        </property>
        <item>
         <widget class="QLabel" name="appIcon">
-         <property name="text">
-          <string>📦</string>
-         </property>
          <property name="font">
           <font>
-           <pointsize>20</pointsize>
+           <pointsize>-1</pointsize>
           </font>
+         </property>
+         <property name="text">
+          <string>📦</string>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QLabel" name="appTitle">
-         <property name="text">
-          <string>DBMS 数据库管理系统</string>
-         </property>
          <property name="font">
           <font>
-           <pointsize>16</pointsize>
-           <weight>75</weight>
+           <pointsize>-1</pointsize>
            <bold>true</bold>
           </font>
+         </property>
+         <property name="text">
+          <string>DBMS 数据库管理系统</string>
          </property>
         </widget>
        </item>
@@ -284,9 +279,6 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
         <widget class="QLineEdit" name="inputDbName">
          <property name="placeholderText">
           <string>数据库名</string>
-         </property>
-         <property name="minimumWidth">
-          <number>120</number>
          </property>
         </widget>
        </item>
@@ -316,9 +308,6 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
          <property name="placeholderText">
           <string>用户名</string>
          </property>
-         <property name="minimumWidth">
-          <number>100</number>
-         </property>
         </widget>
        </item>
        <item>
@@ -331,13 +320,10 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
        <item>
         <widget class="QLineEdit" name="inputPassword">
          <property name="echoMode">
-          <enum>QLineEdit::Password</enum>
+          <enum>QLineEdit::EchoMode::Password</enum>
          </property>
          <property name="placeholderText">
           <string>密码</string>
-         </property>
-         <property name="minimumWidth">
-          <number>100</number>
          </property>
         </widget>
        </item>
@@ -358,63 +344,58 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
        <item>
         <spacer name="topToolbarSpacer">
          <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
          </property>
         </spacer>
        </item>
        <item>
         <widget class="QLabel" name="labelWelcome">
-         <property name="text">
-          <string>未登录</string>
-         </property>
          <property name="font">
           <font>
-           <weight>75</weight>
+           <pointsize>-1</pointsize>
            <bold>true</bold>
           </font>
          </property>
          <property name="styleSheet">
           <string notr="true">color: #a6e3a1;</string>
          </property>
+         <property name="text">
+          <string>未登录</string>
+         </property>
         </widget>
        </item>
       </layout>
      </widget>
     </item>
-    <!-- 主内容区 -->
     <item>
      <layout class="QHBoxLayout" name="mainLayout">
-      <!-- 左侧数据库树 -->
       <item>
        <widget class="QWidget" name="sidebar" native="true">
-        <property name="minimumWidth">
-         <number>220</number>
-        </property>
-        <property name="maximumWidth">
-         <number>280</number>
-        </property>
         <layout class="QVBoxLayout" name="sidebarLayout">
          <property name="spacing">
           <number>12</number>
          </property>
          <item>
           <widget class="QLabel" name="sidebarTitle">
-           <property name="text">
-            <string>数据库/表</string>
-           </property>
            <property name="font">
             <font>
-             <weight>75</weight>
+             <pointsize>-1</pointsize>
              <bold>true</bold>
             </font>
+           </property>
+           <property name="text">
+            <string>数据库/表</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QTreeWidget" name="dbTree">
-           <property name="minimumWidth">
-            <number>200</number>
-           </property>
            <property name="indentation">
             <number>15</number>
            </property>
@@ -459,14 +440,14 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
          </item>
          <item>
           <widget class="QLabel" name="tableTitle">
-           <property name="text">
-            <string>字段操作</string>
-           </property>
            <property name="font">
             <font>
-             <weight>75</weight>
+             <pointsize>-1</pointsize>
              <bold>true</bold>
             </font>
+           </property>
+           <property name="text">
+            <string>字段操作</string>
            </property>
           </widget>
          </item>
@@ -510,14 +491,19 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
          <item>
           <spacer name="sidebarSpacer">
            <property name="orientation">
-            <enum>Qt::Vertical</enum>
+            <enum>Qt::Orientation::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>0</width>
+             <height>0</height>
+            </size>
            </property>
           </spacer>
          </item>
         </layout>
        </widget>
       </item>
-      <!-- 右侧主内容 -->
       <item>
        <widget class="QWidget" name="mainContent" native="true">
         <layout class="QVBoxLayout" name="mainContentLayout">
@@ -536,7 +522,6 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
          <property name="bottomMargin">
           <number>12</number>
          </property>
-         <!-- 数据操作工具栏 -->
          <item>
           <widget class="QWidget" name="dataToolbar" native="true">
            <layout class="QHBoxLayout" name="dataToolbarLayout">
@@ -565,6 +550,27 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
              </widget>
             </item>
             <item>
+             <widget class="QPushButton" name="btnAddRow">
+              <property name="text">
+               <string>➕ 新增行</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnSaveTable">
+              <property name="text">
+               <string>💾 保存修改</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnDeleteRow">
+              <property name="text">
+               <string>🗑️ 删除行</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QPushButton" name="btnShowChart">
               <property name="text">
                <string>📊 统计图表</string>
@@ -574,7 +580,13 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
             <item>
              <spacer name="dataToolbarSpacer">
               <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>0</width>
+                <height>0</height>
+               </size>
               </property>
              </spacer>
             </item>
@@ -588,10 +600,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
             <item>
              <widget class="QLineEdit" name="inputSearch">
               <property name="placeholderText">
-               <string>如: age > 20 AND name LIKE '张%'</string>
-              </property>
-              <property name="minimumWidth">
-               <number>200</number>
+               <string>如: age &gt; 20 AND name LIKE '张%'</string>
               </property>
              </widget>
             </item>
@@ -619,7 +628,6 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
            </layout>
           </widget>
          </item>
-         <!-- 标签页 -->
          <item>
           <widget class="QTabWidget" name="dataTableView">
            <property name="currentIndex">
@@ -651,10 +659,10 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 <bool>true</bool>
                </property>
                <property name="selectionBehavior">
-                <enum>QAbstractItemView::SelectRows</enum>
+                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
                </property>
                <property name="gridStyle">
-                <enum>Qt::DotLine</enum>
+                <enum>Qt::PenStyle::DotLine</enum>
                </property>
               </widget>
              </item>
@@ -686,10 +694,10 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 <bool>true</bool>
                </property>
                <property name="selectionBehavior">
-                <enum>QAbstractItemView::SelectRows</enum>
+                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
                </property>
                <property name="gridStyle">
-                <enum>Qt::DotLine</enum>
+                <enum>Qt::PenStyle::DotLine</enum>
                </property>
               </widget>
              </item>
@@ -724,11 +732,11 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
              </item>
              <item>
               <widget class="QTextEdit" name="sqlInput">
-               <property name="placeholderText">
-                <string>例如: CREATE DATABASE mydb; 或 CREATE TABLE users (id INT, name TEXT);</string>
-               </property>
                <property name="tabStopDistance">
                 <double>40.000000000000000</double>
+               </property>
+               <property name="placeholderText">
+                <string>例如: CREATE DATABASE mydb; 或 CREATE TABLE users (id INT, name TEXT);</string>
                </property>
               </widget>
              </item>
@@ -747,28 +755,34 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 </item>
                 <item>
                  <widget class="QLabel" name="labelQueryTime">
-                  <property name="text">
-                   <string>查询用时: --</string>
-                  </property>
                   <property name="styleSheet">
                    <string notr="true">color: #f38ba8; font-weight: bold;</string>
+                  </property>
+                  <property name="text">
+                   <string>查询用时: --</string>
                   </property>
                  </widget>
                 </item>
                 <item>
                  <spacer name="sqlExecSpacer">
                   <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
+                   <enum>Qt::Orientation::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>0</width>
+                    <height>0</height>
+                   </size>
                   </property>
                  </spacer>
                 </item>
                 <item>
                  <widget class="QPushButton" name="btnPrevPage">
-                  <property name="text">
-                   <string>◀ 上一页</string>
-                  </property>
                   <property name="enabled">
                    <bool>false</bool>
+                  </property>
+                  <property name="text">
+                   <string>◀ 上一页</string>
                   </property>
                  </widget>
                 </item>
@@ -781,11 +795,11 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 </item>
                 <item>
                  <widget class="QPushButton" name="btnNextPage">
-                  <property name="text">
-                   <string>下一页 ▶</string>
-                  </property>
                   <property name="enabled">
                    <bool>false</bool>
+                  </property>
+                  <property name="text">
+                   <string>下一页 ▶</string>
                   </property>
                  </widget>
                 </item>
@@ -798,7 +812,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 <bool>true</bool>
                </property>
                <property name="selectionBehavior">
-                <enum>QAbstractItemView::SelectRows</enum>
+                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
                </property>
               </widget>
              </item>
@@ -811,12 +825,8 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
       </item>
      </layout>
     </item>
-    <!-- 底部日志 -->
     <item>
      <widget class="QTextEdit" name="logOutput">
-      <property name="maximumHeight">
-       <number>120</number>
-      </property>
       <property name="readOnly">
        <bool>true</bool>
       </property>
@@ -832,8 +842,8 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1200</width>
-     <height>24</height>
+     <width>1449</width>
+     <height>32</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

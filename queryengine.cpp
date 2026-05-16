@@ -168,21 +168,47 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
     }
 
     if (!orderBy.isEmpty()) {
+        qDebug() << "[QueryEngine] Sorting by:" << orderBy;
         QStringList parts = orderBy.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
         QString sortField = parts.value(0);
         bool desc = (parts.size() > 1 && parts[1].toUpper() == "DESC");
+        qDebug() << "[QueryEngine] sortField:" << sortField << "desc:" << desc;
+        
+        FieldType sortFieldType = FieldType::TEXT;
+        for (const Field &f : fields) {
+            if (f.name == sortField) {
+                sortFieldType = f.type;
+                break;
+            }
+        }
+        qDebug() << "[QueryEngine] sortFieldType:" << (int)sortFieldType;
+        
         QVector<QJsonValue> vecRecords;
         for (const QJsonValue &v : records) vecRecords.append(v);
         std::sort(vecRecords.begin(), vecRecords.end(),
-                  [&](const QJsonValue &a, const QJsonValue &b) {
+                  [=](const QJsonValue &a, const QJsonValue &b) {
                       QJsonObject oa = a.toObject(), ob = b.toObject();
-                      QVariant va = oa.value(sortField).toVariant();
-                      QVariant vb = ob.value(sortField).toVariant();
-                      if (desc) return va.toString() > vb.toString();
-                      else return va.toString() < vb.toString();
+                      QJsonValue va = oa.value(sortField);
+                      QJsonValue vb = ob.value(sortField);
+                      
+                      bool less = false;
+                      if (sortFieldType == FieldType::INT || sortFieldType == FieldType::DOUBLE) {
+                          double aVal = va.toDouble();
+                          double bVal = vb.toDouble();
+                          less = aVal < bVal;
+                      } else if (sortFieldType == FieldType::BOOLEAN) {
+                          bool aVal = va.toBool();
+                          bool bVal = vb.toBool();
+                          less = aVal < bVal;
+                      } else {
+                          less = va.toString() < vb.toString();
+                      }
+                      
+                      return desc ? !less : less;
                   });
         records = QJsonArray();
         for (const QJsonValue &v : vecRecords) records.append(v);
+        qDebug() << "[QueryEngine] After sort, first record:" << records.first().toObject();
     }
 
     if (!columns.isEmpty() && !(columns.size()==1 && columns[0].trimmed()=="*")) {

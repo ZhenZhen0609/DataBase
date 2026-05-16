@@ -284,14 +284,14 @@ Response DataMigrator::copyTable(const QString &username, const QString &dbName,
 }
 
 Response DataMigrator::copyDatabase(const QString &username, const QString &sourceDb, const QString &targetDb) {
-    QString sourcePath = Config::DATA_PATH + username + "/" + sourceDb;
+    QString sourcePath = Config::dataPath() + username + "/" + sourceDb;
     QDir sourceDir(sourcePath);
 
     if (!sourceDir.exists()) {
         return {ResponseStatus::ERROR, QString("[DataMigrator] Source database '%1' not found").arg(sourceDb), QVariant()};
     }
 
-    QString targetPath = Config::DATA_PATH + username + "/" + targetDb;
+    QString targetPath = Config::dataPath() + username + "/" + targetDb;
     QDir targetDir(targetPath);
 
     if (!targetDir.exists() && !targetDir.mkpath(".")) {
@@ -390,7 +390,7 @@ Response DataMigrator::migrateTableSchema(const QString &username, const QString
 // 批量数据迁移 - 将源数据库的表迁移到目标数据库
 Response DataMigrator::batchMigrateData(const QString &username, const QString &sourceDb, 
                                         const QString &targetDb, const QStringList &tables) {
-    QString sourcePath = Config::DATA_PATH + username + "/" + sourceDb;
+    QString sourcePath = Config::dataPath() + username + "/" + sourceDb;
     QDir sourceDir(sourcePath);
 
     if (!sourceDir.exists()) {
@@ -507,8 +507,8 @@ Response DataMigrator::checkCompatibility(const QString &username, const QString
 
 // 迁移验证 - 验证源数据库和目标数据库的迁移可行性
 Response DataMigrator::validateMigration(const QString &username, const QString &sourceDb, const QString &targetDb) {
-    QString sourcePath = Config::DATA_PATH + username + "/" + sourceDb;
-    QString targetPath = Config::DATA_PATH + username + "/" + targetDb;
+    QString sourcePath = Config::dataPath() + username + "/" + sourceDb;
+    QString targetPath = Config::dataPath() + username + "/" + targetDb;
 
     QDir sourceDir(sourcePath);
     QDir targetDir(targetPath);

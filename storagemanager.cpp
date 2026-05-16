@@ -16,7 +16,7 @@ StorageManager::~StorageManager() {}
 //建库
 bool StorageManager::createDatabase(const QString &username, const QString &dbName)
 {
-    QString rootPath = Config::DATA_PATH;
+    QString rootPath = Config::dataPath();
     QDir dir;
     if (!dir.exists(rootPath)) {
         if (!dir.mkpath(rootPath)) return false;
@@ -48,7 +48,7 @@ bool StorageManager::createDatabase(const QString &username, const QString &dbNa
 //快速建表
 bool StorageManager::createTable(const QString &username, QString dbName, QString tableName)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
@@ -108,7 +108,7 @@ bool StorageManager::createTable(const QString &username, QString dbName, QStrin
 //元数据写入
 bool StorageManager::writeTableDefinition(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Database folder does not exist:" << dbName;
@@ -139,7 +139,7 @@ bool StorageManager::writeTableDefinition(const QString &username, const QString
 //建表
 bool StorageManager::createTable(const QString &username, QString dbName, QString tableName, const QList<Field> &fields)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
@@ -243,7 +243,7 @@ bool StorageManager::createTable(const QString &username, QString dbName, QStrin
 //元数据读取
 QList<Field> StorageManager::loadTableSchema(const QString &username, QString dbName, QString tableName)
 {
-    QString tdfPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".tdf";
+    QString tdfPath = Config::dataPath() + username + "/" + dbName + "/" + tableName + ".tdf";
     QFile file(tdfPath);
 
     if (!file.exists()) {
@@ -304,7 +304,7 @@ QList<Field> StorageManager::loadTableSchema(const QString &username, QString db
 //删除表物理文件
 bool StorageManager::dropTable(const QString &username, const QString &dbName, const QString &tableName)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
@@ -351,7 +351,7 @@ bool StorageManager::dropTable(const QString &username, const QString &dbName, c
 //删除整个数据库文件夹
 bool StorageManager::dropDatabase(const QString &username, const QString &dbName)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
 
     if (!dir.exists()) {
@@ -380,7 +380,7 @@ bool StorageManager::dropDatabase(const QString &username, const QString &dbName
 //改表结构
 bool StorageManager::alterTable(const QString &username, const QString &dbName, const QString &tableName, const QList<Field> &newFields)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Error: Database does not exist.";
@@ -463,7 +463,7 @@ bool StorageManager::alterTable(const QString &username, const QString &dbName, 
 void StorageManager::writeLog(const QString &username, const QString &dbName, const QString &logMessage)
 {
     // 定位到该数据库下的 ruanko.log
-    QString logPath = Config::DATA_PATH + username + "/" + dbName + "/ruanko.log";
+    QString logPath = Config::dataPath() + username + "/" + dbName + "/ruanko.log";
     QFile logFile(logPath);
 
     // 以追加 (Append) 和文本 (Text) 模式打开。如果文件不存在会自动创建。
@@ -489,7 +489,7 @@ void StorageManager::writeLog(const QString &username, const QString &dbName, co
 bool StorageManager::createIndexFile(const QString &username, const QString &dbName,
                                       const QString &tableName, const QString &fieldName, FieldType fieldType)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
@@ -533,7 +533,7 @@ bool StorageManager::createIndexFile(const QString &username, const QString &dbN
 bool StorageManager::dropIndexFile(const QString &username, const QString &dbName,
                                     const QString &tableName, const QString &fieldName)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
     if (!dir.exists()) {
         qDebug() << "[Storage] Error: Database folder does not exist:" << dbName;
@@ -577,20 +577,16 @@ QByteArray StorageManager::readTableData(const QString &username, const QString 
 {
     QString cacheKey = dbName + "_" + tableName;
 
-    // 获取读锁
     lockManager.acquireReadLock(username, dbName, tableName);
 
-    // 1. 尝试从缓存中命中
     if (dataCache.contains(cacheKey)) {
         QByteArray cachedData = dataCache.value(cacheKey);
         lockManager.releaseReadLock(username, dbName, tableName);
-        // qDebug() << "[Storage] Cache HIT for table:" << tableName; // 测试时可解开注释看效果
         return cachedData;
     }
 
-    // 2. 缓存未命中，从物理磁盘读取
-    recordDiskRead(); // 埋点记录物理磁盘读取
-    QString trdPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".trd";
+    recordDiskRead();
+    QString trdPath = Config::dataPath() + username + "/" + dbName + "/" + tableName + ".trd";
     QFile trdFile(trdPath);
 
     if (!trdFile.open(QIODevice::ReadOnly)) {
@@ -612,12 +608,11 @@ QByteArray StorageManager::readTableData(const QString &username, const QString 
 // 同步写入硬盘与缓存
 bool StorageManager::writeTableData(const QString &username, const QString &dbName, const QString &tableName, const QByteArray &data)
 {
-    recordDiskWrite(); // 埋点记录物理磁盘写入
+    recordDiskWrite();
 
-    QString trdPath = Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".trd";
+    QString trdPath = Config::dataPath() + username + "/" + dbName + "/" + tableName + ".trd";
     QFile trdFile(trdPath);
 
-    // 获取写锁
     lockManager.acquireWriteLock(username, dbName, tableName);
 
     if (!trdFile.open(QIODevice::WriteOnly)) {
@@ -626,6 +621,7 @@ bool StorageManager::writeTableData(const QString &username, const QString &dbNa
         return false;
     }
     trdFile.write(data);
+    trdFile.flush();
     trdFile.close();
 
     // 同步更新缓存，防止脏读
@@ -646,7 +642,7 @@ void StorageManager::clearTableCache(const QString &dbName, const QString &table
 //开始事务
 bool StorageManager::beginTransaction(const QString &username, const QString &dbName)
 {
-    QString logPath = Config::DATA_PATH + username + "/" + dbName + "/ruanko.log";
+    QString logPath = Config::dataPath() + username + "/" + dbName + "/ruanko.log";
     QFile logFile(logPath);
 
     // 获取写锁
@@ -670,7 +666,7 @@ bool StorageManager::beginTransaction(const QString &username, const QString &db
 //提交事务
 bool StorageManager::commitTransaction(const QString &username, const QString &dbName)
 {
-    QString logPath = Config::DATA_PATH + username + "/" + dbName + "/ruanko.log";
+    QString logPath = Config::dataPath() + username + "/" + dbName + "/ruanko.log";
     QFile logFile(logPath);
 
     // 获取写锁
@@ -694,7 +690,7 @@ bool StorageManager::commitTransaction(const QString &username, const QString &d
 //回滚事务
 bool StorageManager::rollbackTransaction(const QString &username, const QString &dbName)
 {
-    QString logPath = Config::DATA_PATH + username + "/" + dbName + "/ruanko.log";
+    QString logPath = Config::dataPath() + username + "/" + dbName + "/ruanko.log";
     QFile logFile(logPath);
 
     // 获取写锁
@@ -776,7 +772,7 @@ void StorageManager::resetSystemStats()
 // ========================================================
 bool StorageManager::backupDatabase(const QString &username, const QString &dbName)
 {
-    QString sourcePath = Config::DATA_PATH + username + "/" + dbName;
+    QString sourcePath = Config::dataPath() + username + "/" + dbName;
     QDir srcDir(sourcePath);
     QString absPath = srcDir.absolutePath();
     qDebug() << "[Storage] backupDatabase: sourcePath=" << sourcePath << "absPath=" << absPath;
@@ -811,8 +807,8 @@ bool StorageManager::backupDatabase(const QString &username, const QString &dbNa
 
 bool StorageManager::restoreDatabase(const QString &username, const QString &dbName, const QString &backupFolderName)
 {
-    QString sourcePath = Config::DATA_PATH + username + "/" + dbName;
-    QString backupPath = Config::DATA_PATH + username + "/" + backupFolderName;
+    QString sourcePath = Config::dataPath() + username + "/" + dbName;
+    QString backupPath = Config::dataPath() + username + "/" + backupFolderName;
 
     if (!QDir(backupPath).exists()) {
         qDebug() << "[Storage] Restore Error: Backup folder not found.";

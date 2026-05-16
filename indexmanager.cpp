@@ -15,7 +15,7 @@ IndexManager::IndexManager()
 QString IndexManager::getIndexFilePath(const QString& username, const QString& dbName,
                                         const QString& tableName, const QString& fieldName)
 {
-    QString dataPath = Config::DATA_PATH;
+    QString dataPath = Config::dataPath();
     QString indexDir = QString("%1%2/%3/indexes/")
                        .arg(dataPath)
                        .arg(dbName)

@@ -15,17 +15,17 @@ RecordManager::~RecordManager() {}
 
 QString RecordManager::getTrdFilePath(const QString &username, const QString &dbName, const QString &tableName) const
 {
-    return Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".trd";
+    return Config::dataPath() + username + "/" + dbName + "/" + tableName + ".trd";
 }
 
 QString RecordManager::getTdfFilePath(const QString &username, const QString &dbName, const QString &tableName) const
 {
-    return Config::DATA_PATH + username + "/" + dbName + "/" + tableName + ".tdf";
+    return Config::dataPath() + username + "/" + dbName + "/" + tableName + ".tdf";
 }
 
 bool RecordManager::ensureDbDirectory(const QString &username, const QString &dbName) const
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir;
     return dir.exists(dbPath) || dir.mkpath(dbPath);
 }

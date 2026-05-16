@@ -261,15 +261,21 @@ Response SQLParser::execAlterTable(const QString &tableName, const QString &alte
 // ==================== DML 实现（支持表别名） ====================
 Response SQLParser::execSelect(const QString &sql)
 {
-    // 支持 SELECT ... FROM table [alias] [WHERE ...]
     QRegularExpression re(R"(SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(\w+))?(.*))", QRegularExpression::CaseInsensitiveOption);
     auto match = re.match(sql);
     if (!match.hasMatch()) return {ResponseStatus::ERROR, "SELECT 语法错误", QVariant()};
 
     QString colsPart = match.captured(1).trimmed();
-    QString tableName = match.captured(2).trimmed();   // 真实表名
-    QString alias = match.captured(3).trimmed();       // 别名（可能为空）
+    QString tableName = match.captured(2).trimmed();
+    QString alias = match.captured(3).trimmed();
     QString rest = match.captured(4).trimmed();
+
+    QStringList sqlKeywords = {"WHERE", "ORDER", "GROUP", "HAVING", "LIMIT", "JOIN", "LEFT", "RIGHT", "INNER", "UNION", "SELECT", "FROM", "ON", "AND", "OR", "NOT", "IN", "IS", "NULL", "AS", "DISTINCT"};
+    QString aliasUpper = alias.toUpper();
+    if (sqlKeywords.contains(aliasUpper)) {
+        rest = alias + " " + rest;
+        alias.clear();
+    }
 
     QString errMsg;
     if (!checkTableExists(tableName, errMsg)) return {ResponseStatus::ERROR, errMsg, QVariant()};
@@ -285,7 +291,6 @@ Response SQLParser::execSelect(const QString &sql)
         QStringList raw = colsPart.split(',', Qt::SkipEmptyParts);
         for (QString c : raw) {
             c = c.trimmed();
-            // 去除可能存在的别名前缀，如 "e.name" -> "name"
             if (c.contains('.')) c = c.split('.').last();
             columns.append(c);
         }
@@ -312,7 +317,12 @@ Response SQLParser::execSelect(const QString &sql)
 
     QRegularExpression orderRe(R"(\bORDER\s+BY\b\s+(.+?)(?=\b(WHERE|GROUP\s+BY|HAVING|LIMIT)\b|$))", QRegularExpression::CaseInsensitiveOption);
     auto orderMatch = orderRe.match(rest);
-    if (orderMatch.hasMatch()) orderBy = orderMatch.captured(1).trimmed();
+    if (orderMatch.hasMatch()) {
+        orderBy = orderMatch.captured(1).trimmed();
+        qDebug() << "[SQLParser] ORDER BY parsed:" << orderBy;
+    } else {
+        qDebug() << "[SQLParser] No ORDER BY found in rest:" << rest;
+    }
 
     QRegularExpression groupRe(R"(\bGROUP\s+BY\b\s+(.+?)(?=\b(WHERE|ORDER\s+BY|HAVING|LIMIT)\b|$))", QRegularExpression::CaseInsensitiveOption);
     auto groupMatch = groupRe.match(rest);

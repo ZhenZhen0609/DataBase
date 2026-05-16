@@ -74,7 +74,7 @@ bool SchemaManager::validateRecord(const TableSchema &schema, const QJsonObject 
 
 bool SchemaManager::ensureDbDirectory(const QString &username, const QString &dbName) const
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir;
     return dir.exists(dbPath) || dir.mkpath(dbPath);
 }
@@ -141,7 +141,7 @@ Response SchemaManager::loadTableSchema(const QString &username, const QString &
     QList<Field> fields = storageManager.loadTableSchema(username, dbName, tableName);
 
     if (fields.isEmpty()) {
-        QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+        QString dbPath = Config::dataPath() + username + "/" + dbName;
         if (!QDir(dbPath).exists())
             return {ResponseStatus::DB_NOT_FOUND, QString("[Schema] Database '%1' not found").arg(dbName), QVariant()};
         return {ResponseStatus::TABLE_NOT_FOUND, QString("[Schema] Table '%1' not found").arg(tableName), QVariant()};
@@ -156,7 +156,7 @@ Response SchemaManager::loadTableSchema(const QString &username, const QString &
 //加载数据库中的所有表
 Response SchemaManager::loadTables(const QString &username, const QString &dbName)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
 
     if (!dir.exists())
@@ -184,7 +184,7 @@ Response SchemaManager::loadTables(const QString &username, const QString &dbNam
 
 Response SchemaManager::dropTable(const QString &username, const QString &dbName, const QString &tableName)
 {
-    QString dbPath = Config::DATA_PATH + username + "/" + dbName;
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
     QDir dir(dbPath);
 
     if (!dir.exists())
