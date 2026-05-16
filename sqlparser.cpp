@@ -1,6 +1,7 @@
 #include "sqlparser.h"
 #include "storagemanager.h"
 #include "queryengine.h"
+#include "indexmanager.h"
 #include <QRegularExpression>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -42,7 +43,19 @@ bool SQLParser::checkTableExists(const QString &tableName, QString &errorMsg) co
 bool SQLParser::checkColumnsExist(const QString &tableName, const QStringList &colNames, QString &errorMsg) const
 {
     QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDB, tableName);
+    QStringList aggFuncs = {"COUNT", "SUM", "AVG", "MAX", "MIN"};
+    
     for (const QString &col : colNames) {
+        QString colUpper = col.toUpper();
+        bool isAggFunc = false;
+        for (const QString &agg : aggFuncs) {
+            if (colUpper.startsWith(agg + "(")) {
+                isAggFunc = true;
+                break;
+            }
+        }
+        if (isAggFunc) continue;
+        
         bool found = false;
         for (const Field &f : fields) {
             if (f.name == col) { found = true; break; }
@@ -109,6 +122,16 @@ Response SQLParser::parseSingleStatement(const QString &sql)
     if (upper.startsWith("INSERT")) return execInsert(trimmed);
     if (upper.startsWith("UPDATE")) return execUpdate(trimmed);
     if (upper.startsWith("DELETE")) return execDelete(trimmed);
+    
+    if (upper.startsWith("BEGIN") || upper.contains("BEGIN TRANSACTION")) {
+        return m_engine->executeBeginTransaction();
+    }
+    if (upper.startsWith("COMMIT")) {
+        return m_engine->executeCommit();
+    }
+    if (upper.startsWith("ROLLBACK")) {
+        return m_engine->executeRollback();
+    }
 
     if (upper.startsWith("CREATE DATABASE")) {
         if (tokens.size() < 3) return {ResponseStatus::ERROR, "缺少数据库名", QVariant()};
@@ -154,6 +177,43 @@ Response SQLParser::parseSingleStatement(const QString &sql)
     if (upper.startsWith("DROP VIEW")) {
         if (tokens.size() < 3) return {ResponseStatus::ERROR, "缺少视图名", QVariant()};
         return execDropView(tokens[2]);
+    }
+    if (upper.startsWith("CREATE INDEX")) {
+        QRegularExpression indexRe(R"(CREATE\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\((\w+)\))", QRegularExpression::CaseInsensitiveOption);
+        auto match = indexRe.match(trimmed);
+        if (!match.hasMatch()) return {ResponseStatus::ERROR, "CREATE INDEX 语法错误", QVariant()};
+        QString indexName = match.captured(1);
+        QString tableName = match.captured(2);
+        QString fieldName = match.captured(3);
+        
+        QList<Field> fields = m_storage->loadTableSchema(m_currentUser, m_currentDB, tableName);
+        FieldType fieldType = FieldType::TEXT;
+        for (const Field &f : fields) {
+            if (f.name == fieldName) {
+                fieldType = f.type;
+                break;
+            }
+        }
+        
+        IndexManager idxMgr;
+        bool ok = idxMgr.createIndex(m_currentUser, m_currentDB, tableName, fieldName, indexName, fieldType);
+        if (ok) {
+            return {ResponseStatus::OK, QString("索引 '%1' 创建成功").arg(indexName), QVariant()};
+        }
+        return {ResponseStatus::ERROR, QString("索引 '%1' 创建失败").arg(indexName), QVariant()};
+    }
+    if (upper.startsWith("DROP INDEX")) {
+        QRegularExpression dropIndexRe(R"(DROP\s+INDEX\s+(\w+)\s+ON\s+(\w+))", QRegularExpression::CaseInsensitiveOption);
+        auto match = dropIndexRe.match(trimmed);
+        if (!match.hasMatch()) return {ResponseStatus::ERROR, "DROP INDEX 语法错误", QVariant()};
+        QString indexName = match.captured(1);
+        QString tableName = match.captured(2);
+        IndexManager idxMgr;
+        bool ok = idxMgr.dropIndex(m_currentUser, m_currentDB, tableName, indexName);
+        if (ok) {
+            return {ResponseStatus::OK, QString("索引 '%1' 删除成功").arg(indexName), QVariant()};
+        }
+        return {ResponseStatus::ERROR, QString("索引 '%1' 删除失败").arg(indexName), QVariant()};
     }
 
     return {ResponseStatus::ERROR, "不支持的SQL指令: " + trimmed, QVariant()};
@@ -278,7 +338,15 @@ Response SQLParser::execSelect(const QString &sql)
     }
 
     QString errMsg;
-    if (!checkTableExists(tableName, errMsg)) return {ResponseStatus::ERROR, errMsg, QVariant()};
+    if (!checkTableExists(tableName, errMsg)) {
+        QString viewsPath = Config::dataPath() + m_currentUser + "/" + m_currentDB + "/views.json";
+        QFile viewsFile(viewsPath);
+        if (!viewsFile.exists() || !viewsFile.open(QIODevice::ReadOnly) || 
+            !QJsonDocument::fromJson(viewsFile.readAll()).object().contains(tableName)) {
+            return {ResponseStatus::ERROR, errMsg, QVariant()};
+        }
+        viewsFile.close();
+    }
 
     bool distinct = false;
     if (colsPart.toUpper().startsWith("DISTINCT ")) {
@@ -287,11 +355,20 @@ Response SQLParser::execSelect(const QString &sql)
     }
 
     QStringList columns;
+    QMap<QString, QString> aliasMap;
     if (colsPart != "*") {
         QStringList raw = colsPart.split(',', Qt::SkipEmptyParts);
         for (QString c : raw) {
             c = c.trimmed();
+            QString original = c;
             if (c.contains('.')) c = c.split('.').last();
+            QRegularExpression asRe(R"(\s+AS\s+(\w+)\s*$)", QRegularExpression::CaseInsensitiveOption);
+            auto asMatch = asRe.match(c);
+            if (asMatch.hasMatch()) {
+                QString alias = asMatch.captured(1);
+                c = c.left(asMatch.capturedStart()).trimmed();
+                aliasMap[alias] = c;
+            }
             columns.append(c);
         }
         if (!checkColumnsExist(tableName, columns, errMsg)) return {ResponseStatus::ERROR, errMsg, QVariant()};
@@ -335,6 +412,13 @@ Response SQLParser::execSelect(const QString &sql)
     QRegularExpression havingRe(R"(\bHAVING\b\s+(.+?)(?=\b(WHERE|ORDER\s+BY|GROUP\s+BY|LIMIT)\b|$))", QRegularExpression::CaseInsensitiveOption);
     auto havingMatch = havingRe.match(rest);
     if (havingMatch.hasMatch()) having = havingMatch.captured(1).trimmed();
+    
+    if (!aliasMap.isEmpty() && !having.isEmpty()) {
+        for (auto it = aliasMap.begin(); it != aliasMap.end(); ++it) {
+            having.replace(QRegularExpression("\\b" + it.key() + "\\b"), it.value());
+        }
+        qDebug() << "[SQLParser] HAVING after alias replace:" << having;
+    }
 
     QRegularExpression limitRe(R"(\bLIMIT\b\s+(\d+)(?:\s+OFFSET\s+(\d+))?)", QRegularExpression::CaseInsensitiveOption);
     auto limitMatch = limitRe.match(rest);

@@ -46,8 +46,8 @@ private:
      */
     LockManager lockManager;
 
-    // 简单查询缓存池 (Key: 数据库名_表名, Value: 表数据的二进制块)
-    QHash<QString, QByteArray> dataCache;
+    // 简单查询缓存池 (Key: 数据库名_表名, Value: 表数据的二进制块) - 静态共享
+    static QHash<QString, QByteArray> dataCache;
 
     // 系统监控数据存储
     SystemMonitorStats monitorStats;
@@ -134,6 +134,11 @@ public:
      * @brief 清除特定表的内存缓存 (在删表或删库时调用)
      */
     void clearTableCache(const QString &dbName, const QString &tableName);
+    
+    /**
+     * @brief 清除所有缓存 (在事务回滚时调用)
+     */
+    static void clearAllCache();
 
     // 阶段五第二周：系统监控接口 ---
 

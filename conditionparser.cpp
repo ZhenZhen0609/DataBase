@@ -10,11 +10,20 @@ ComparisonNode::ComparisonNode(const QString &field, Op op, const QVariant &valu
 bool ComparisonNode::evaluate(const QJsonObject &record, const QList<Field> &fields) const {
     if (!record.contains(m_field)) return false;
     QVariant recVal = record.value(m_field).toVariant();
+    
+    QVariant compareValue = m_value;
+    if (m_value.typeId() == QMetaType::QString) {
+        QString possibleField = m_value.toString();
+        if (record.contains(possibleField)) {
+            compareValue = record.value(possibleField).toVariant();
+        }
+    }
+    
     for (const auto &f : fields) {
         if (f.name == m_field) {
             if (f.type == FieldType::INT) {
                 int a = recVal.toInt();
-                int b = m_value.toInt();
+                int b = compareValue.toInt();
                 switch (m_op) {
                 case EQUAL:     return a == b;
                 case NOT_EQUAL: return a != b;
@@ -25,7 +34,7 @@ bool ComparisonNode::evaluate(const QJsonObject &record, const QList<Field> &fie
                 }
             } else if (f.type == FieldType::DOUBLE) {
                 double a = recVal.toDouble();
-                double b = m_value.toDouble();
+                double b = compareValue.toDouble();
                 switch (m_op) {
                 case EQUAL:     return qFuzzyCompare(a, b);
                 case NOT_EQUAL: return !qFuzzyCompare(a, b);
@@ -36,7 +45,7 @@ bool ComparisonNode::evaluate(const QJsonObject &record, const QList<Field> &fie
                 }
             } else if (f.type == FieldType::BOOLEAN) {
                 bool a = recVal.toBool();
-                bool b = m_value.toBool();
+                bool b = compareValue.toBool();
                 switch (m_op) {
                 case EQUAL:     return a == b;
                 case NOT_EQUAL: return a != b;
@@ -44,7 +53,7 @@ bool ComparisonNode::evaluate(const QJsonObject &record, const QList<Field> &fie
                 }
             } else {
                 QString a = recVal.toString();
-                QString b = m_value.toString();
+                QString b = compareValue.toString();
                 switch (m_op) {
                 case EQUAL:     return a == b;
                 case NOT_EQUAL: return a != b;

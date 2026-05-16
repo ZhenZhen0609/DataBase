@@ -53,6 +53,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnAddField,  &QPushButton::clicked, this, &MainWindow::onAddField);
     connect(ui->btnDropField, &QPushButton::clicked, this, &MainWindow::onDropField);
     connect(ui->btnAlterField, &QPushButton::clicked, this, &MainWindow::onAlterField);
+    
+    QPushButton *btnRefreshTree = new QPushButton("🔄 刷新字段", this);
+    ui->tableActionsLayout->addWidget(btnRefreshTree, 2, 0, 1, 2);
+    connect(btnRefreshTree, &QPushButton::clicked, this, &MainWindow::refreshTree);
 
     // 数据操作按钮
     connect(ui->btnRefreshData,   &QPushButton::clicked, this, &MainWindow::onRefreshData);
@@ -65,10 +69,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnImportJSON, &QPushButton::clicked, this, &MainWindow::onImportJSON);
     connect(ui->tableData->horizontalHeader(), &QHeaderView::sectionClicked, this, &MainWindow::onTableHeaderClicked);
 
-    // 蓝圈功能: 导出CSV按钮 (动态添加到dataToolbarLayout)
+    // 蓝圈功能: 导出CSV按钮 (动态添加到dataToolbarRow2)
     QPushButton *btnExportCSV = new QPushButton("📤 导出CSV", this);
     btnExportCSV->setObjectName("btnExportCSV");
-    ui->dataToolbarLayout->addWidget(btnExportCSV);
+    ui->dataToolbarRow2->addWidget(btnExportCSV);
     connect(btnExportCSV, &QPushButton::clicked, this, &MainWindow::onExportCSV);
 
     // 蓝圈功能: 备份/恢复数据库按钮 (动态添加到sidebarLayout)
@@ -126,6 +130,7 @@ MainWindow::MainWindow(QWidget *parent)
     // 将StorageManager和QueryEngine注入SQLParser
     m_parser->setStorageManager(m_storage);
     m_parser->setQueryEngine(m_queryEngine);
+    m_queryEngine->setParser(m_parser);
 
     log("系统就绪，请先登录。默认账号: admin / 123456");
 }
@@ -170,6 +175,25 @@ void MainWindow::refreshTree()
             QTreeWidgetItem *tableItem = new QTreeWidgetItem(dbItem);
             tableItem->setText(0, tableName);
             tableItem->setData(0, Qt::UserRole, "table");
+            
+            QList<Field> fields = m_storage->loadTableSchema(m_currentUser, dbName, tableName);
+            for (const Field &f : fields) {
+                QTreeWidgetItem *fieldItem = new QTreeWidgetItem(tableItem);
+                QString typeStr;
+                switch (f.type) {
+                    case FieldType::INT: typeStr = "INT"; break;
+                    case FieldType::TEXT: typeStr = "TEXT"; break;
+                    case FieldType::DOUBLE: typeStr = "DOUBLE"; break;
+                    case FieldType::BOOLEAN: typeStr = "BOOLEAN"; break;
+                }
+                QString fieldInfo = f.name + " (" + typeStr;
+                if (f.isPrimaryKey) fieldInfo += ", PK";
+                if (f.isNotNull) fieldInfo += ", NOT NULL";
+                fieldInfo += ")";
+                fieldItem->setText(0, fieldInfo);
+                fieldItem->setData(0, Qt::UserRole, "field");
+                fieldItem->setForeground(0, QColor(100, 100, 100));
+            }
         }
     }
 }

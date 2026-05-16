@@ -9,6 +9,8 @@
 #include "storagemanager.h"
 #include "conditionparser.h"
 
+class SQLParser;
+
 class QueryEngine : public QObject
 {
     Q_OBJECT
@@ -17,6 +19,7 @@ public:
 
     void setCurrentUser(const QString &user);
     void setCurrentDatabase(const QString &db);
+    void setParser(SQLParser *parser);
 
     // DML 执行入口
     Response executeSelect(const QString &tableName, const QStringList &columns,
@@ -34,6 +37,11 @@ public:
     Response executeUnion(const QString &leftSql, const QString &rightSql, bool distinct);
     Response executeCreateView(const QString &viewName, const QString &selectSql);
     Response executeDropView(const QString &viewName);
+    
+    // 事务管理
+    Response executeBeginTransaction();
+    Response executeCommit();
+    Response executeRollback();
 
     // 合并两个结果集（供 UNION 使用）
     Response mergeUnion(const QJsonArray &leftRows, const QJsonArray &rightRows, bool distinct);
@@ -46,6 +54,7 @@ private:
     QString m_currentDb;
     RecordManager m_record;
     SchemaManager m_schema;
+    SQLParser *m_parser = nullptr;
 
     // 辅助：获取表结构和所有记录
     bool loadTableData(const QString &tableName, QList<Field> &fields, QJsonArray &records, Response &error);

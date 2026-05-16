@@ -1,4 +1,5 @@
 #include "queryengine.h"
+#include "sqlparser.h"
 #include "constraintmanager.h"
 #include <QJsonArray>
 #include <QJsonObject>
@@ -14,6 +15,7 @@ QueryEngine::QueryEngine(QObject *parent) : QObject(parent) {}
 
 void QueryEngine::setCurrentUser(const QString &user) { m_currentUser = user; }
 void QueryEngine::setCurrentDatabase(const QString &db) { m_currentDb = db; }
+void QueryEngine::setParser(SQLParser *parser) { m_parser = parser; }
 
 bool QueryEngine::loadTableData(const QString &tableName, QList<Field> &fields, QJsonArray &records, Response &error) {
     Response res = m_schema.loadTableSchema(m_currentUser, m_currentDb, tableName);
@@ -91,10 +93,19 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
                                     int limit, int offset, bool distinct)
 {
     qDebug() << "[QueryEngine] executeSelect:" << tableName;
+    
+    QString expandedSql = expandView(tableName);
+    if (!expandedSql.isEmpty()) {
+        qDebug() << "[QueryEngine] View expanded to:" << expandedSql;
+        return m_parser ? m_parser->parseSQL(expandedSql) : Response{ResponseStatus::ERROR, "No parser", QVariant()};
+    }
+    
     QList<Field> fields;
     QJsonArray records;
     Response err;
-    if (!loadTableData(tableName, fields, records, err)) return err;
+    if (!loadTableData(tableName, fields, records, err)) {
+        return err;
+    }
 
     if (!whereClause.isEmpty()) {
         auto cond = ConditionParser::parse(whereClause);
@@ -116,6 +127,7 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
     }
 
     if (!groupBy.isEmpty() || hasAgg) {
+        qDebug() << "[QueryEngine] GROUP BY:" << groupBy << "hasAgg:" << hasAgg << "columns:" << columns;
         QMap<QString, QJsonArray> groups;
         for (const auto &val : records) {
             QJsonObject obj = val.toObject();
@@ -159,8 +171,15 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
                 }
             }
             if (!having.isEmpty()) {
+                qDebug() << "[QueryEngine] HAVING:" << having;
                 auto havingCond = ConditionParser::parse(having);
-                if (havingCond && !havingCond->evaluate(out, fields)) continue;
+                if (!havingCond) {
+                    qDebug() << "[QueryEngine] HAVING parse failed";
+                } else {
+                    bool pass = havingCond->evaluate(out, fields);
+                    qDebug() << "[QueryEngine] HAVING evaluate result:" << pass << "out:" << out;
+                    if (!pass) continue;
+                }
             }
             result.append(out);
         }
@@ -475,21 +494,45 @@ Response QueryEngine::executeDelete(const QString &tableName, const QString &whe
 // ========================= JOIN 实现（支持别名） =========================
 Response QueryEngine::executeJoinSelect(const QString &sql)
 {
-    // 匹配：SELECT ... FROM table1 [alias1] JOIN table2 [alias2] ON condition
-    QRegularExpression joinRe(R"(SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(\w+))?\s+JOIN\s+(\w+)(?:\s+(\w+))?\s+ON\s+(.+?)(?=\s+(?:JOIN|WHERE|ORDER\s+BY|LIMIT|$))?)",
-                              QRegularExpression::CaseInsensitiveOption);
-    auto match = joinRe.match(sql);
-    if (!match.hasMatch()) {
+    qDebug() << "[QueryEngine] executeJoinSelect input:" << sql;
+    
+    int onIdx = sql.indexOf(QRegularExpression("\\bON\\b", QRegularExpression::CaseInsensitiveOption));
+    if (onIdx == -1) {
+        return {ResponseStatus::ERROR, "JOIN missing ON clause", QVariant()};
+    }
+    
+    QString beforeOn = sql.left(onIdx).trimmed();
+    QString afterOn = sql.mid(onIdx + 2).trimmed();
+    
+    qDebug() << "[QueryEngine] beforeOn:" << beforeOn;
+    qDebug() << "[QueryEngine] afterOn:" << afterOn;
+    
+    QRegularExpression beforeOnRe(R"(SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(\w+))?\s+JOIN\s+(\w+)(?:\s+(\w+))?)",
+                                  QRegularExpression::CaseInsensitiveOption);
+    auto beforeMatch = beforeOnRe.match(beforeOn);
+    if (!beforeMatch.hasMatch()) {
         return {ResponseStatus::ERROR, "Invalid JOIN syntax", QVariant()};
     }
-
-    QString columnsPart = match.captured(1).trimmed();
-    QString table1Name = match.captured(2).trimmed();
-    QString table1Alias = match.captured(3).trimmed();
-    QString table2Name = match.captured(4).trimmed();
-    QString table2Alias = match.captured(5).trimmed();
-    QString onCondition = match.captured(6).trimmed();
-    QString remaining = sql.mid(match.capturedEnd()).trimmed();
+    
+    QString columnsPart = beforeMatch.captured(1).trimmed();
+    QString table1Name = beforeMatch.captured(2).trimmed();
+    QString table1Alias = beforeMatch.captured(3).trimmed();
+    QString table2Name = beforeMatch.captured(4).trimmed();
+    QString table2Alias = beforeMatch.captured(5).trimmed();
+    
+    QString onCondition = afterOn;
+    QString remaining;
+    
+    QRegularExpression remainingRe(R"((.+?)(?:\s+(?:WHERE|ORDER\s+BY|LIMIT)\b\s+(.*))?$)", QRegularExpression::CaseInsensitiveOption);
+    auto remainingMatch = remainingRe.match(afterOn);
+    if (remainingMatch.hasMatch()) {
+        onCondition = remainingMatch.captured(1).trimmed();
+        remaining = remainingMatch.captured(2).trimmed();
+    }
+    
+    qDebug() << "[QueryEngine] JOIN: table1=" << table1Name << "alias1=" << table1Alias 
+             << "table2=" << table2Name << "alias2=" << table2Alias;
+    qDebug() << "[QueryEngine] ON condition:" << onCondition << "remaining:" << remaining;
 
     // 加载两个表的数据（使用真实表名）
     QList<Field> fields1, fields2;
@@ -497,15 +540,31 @@ Response QueryEngine::executeJoinSelect(const QString &sql)
     Response err;
     if (!loadTableData(table1Name, fields1, records1, err)) return err;
     if (!loadTableData(table2Name, fields2, records2, err)) return err;
+    
+    qDebug() << "[QueryEngine] Table1" << table1Name << "records:" << records1.size();
+    qDebug() << "[QueryEngine] Table2" << table2Name << "records:" << records2.size();
 
-    // 将 ON 条件中的别名替换为真实字段名（简单替换）
+    // 将 ON 条件中的别名替换为真实字段名
     QString actualOn = onCondition;
+    // 处理表名.字段名格式
+    actualOn.replace(QRegularExpression("\\b" + table1Name + "\\."), "");
     if (!table1Alias.isEmpty()) {
         actualOn.replace(QRegularExpression("\\b" + table1Alias + "\\."), "");
     }
+    
+    // 对于table2的字段，如果有重名，需要加上表名前缀
+    QStringList table1FieldNames;
+    for (const Field &f : fields1) table1FieldNames << f.name;
+    
+    QString table2Prefix = table2Name + ".";
     if (!table2Alias.isEmpty()) {
-        actualOn.replace(QRegularExpression("\\b" + table2Alias + "\\."), "");
+        actualOn.replace(QRegularExpression("\\b" + table2Alias + "\\."), table2Prefix);
+    } else {
+        actualOn.replace(QRegularExpression("\\b" + table2Name + "\\."), table2Prefix);
     }
+    
+    qDebug() << "[QueryEngine] actualOn after replace:" << actualOn;
+    
     auto cond = ConditionParser::parse(actualOn);
     if (!cond) {
         return {ResponseStatus::ERROR, "Failed to parse JOIN ON condition: " + onCondition, QVariant()};
@@ -524,9 +583,14 @@ Response QueryEngine::executeJoinSelect(const QString &sql)
             allFields.append(f);
         }
     }
+    
+    qDebug() << "[QueryEngine] allFields count:" << allFields.size();
+    for (const Field &f : allFields) qDebug() << "  field:" << f.name;
 
     // 笛卡尔积 + ON 过滤
     QJsonArray resultRecords;
+    int matchCount = 0;
+    int testCount = 0;
     for (const QJsonValue &v1 : records1) {
         QJsonObject obj1 = v1.toObject();
         for (const QJsonValue &v2 : records2) {
@@ -538,9 +602,20 @@ Response QueryEngine::executeJoinSelect(const QString &sql)
                 for (const Field &f1 : fields1) if (f1.name == f.name) { key = table2Name + "." + f.name; break; }
                 merged[key] = obj2[f.name];
             }
-            if (cond->evaluate(merged, allFields)) resultRecords.append(merged);
+            
+            if (testCount < 3) {
+                qDebug() << "[QueryEngine] Test merge" << testCount << ": dept_id=" << merged["dept_id"] << "departments.id=" << merged["departments.id"];
+                testCount++;
+            }
+            
+            if (cond->evaluate(merged, allFields)) {
+                resultRecords.append(merged);
+                matchCount++;
+            }
         }
     }
+    
+    qDebug() << "[QueryEngine] Cartesian product:" << (records1.size() * records2.size()) << "matches:" << matchCount;
 
     // 处理剩余的 WHERE, ORDER BY, LIMIT
     if (!remaining.isEmpty()) {
@@ -652,6 +727,46 @@ Response QueryEngine::mergeUnion(const QJsonArray &leftRows, const QJsonArray &r
     QJsonDocument doc(result);
     QString jsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
     return {ResponseStatus::OK, QString("UNION returned %1 rows").arg(result.size()), QVariant(jsonStr)};
+}
+
+// ========================= 事务管理 =========================
+Response QueryEngine::executeBeginTransaction()
+{
+    if (m_currentUser.isEmpty() || m_currentDb.isEmpty()) {
+        return {ResponseStatus::ERROR, "请先选择数据库", QVariant()};
+    }
+    StorageManager storage;
+    bool ok = storage.beginTransaction(m_currentUser, m_currentDb);
+    if (ok) {
+        return {ResponseStatus::OK, "事务已开始", QVariant()};
+    }
+    return {ResponseStatus::ERROR, "开始事务失败", QVariant()};
+}
+
+Response QueryEngine::executeCommit()
+{
+    if (m_currentUser.isEmpty() || m_currentDb.isEmpty()) {
+        return {ResponseStatus::ERROR, "请先选择数据库", QVariant()};
+    }
+    StorageManager storage;
+    bool ok = storage.commitTransaction(m_currentUser, m_currentDb);
+    if (ok) {
+        return {ResponseStatus::OK, "事务已提交", QVariant()};
+    }
+    return {ResponseStatus::ERROR, "提交事务失败", QVariant()};
+}
+
+Response QueryEngine::executeRollback()
+{
+    if (m_currentUser.isEmpty() || m_currentDb.isEmpty()) {
+        return {ResponseStatus::ERROR, "请先选择数据库", QVariant()};
+    }
+    StorageManager storage;
+    bool ok = storage.rollbackTransaction(m_currentUser, m_currentDb);
+    if (ok) {
+        return {ResponseStatus::OK, "事务已回滚", QVariant()};
+    }
+    return {ResponseStatus::ERROR, "回滚事务失败", QVariant()};
 }
 
 // ========================= 视图实现 =========================

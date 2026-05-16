@@ -9,6 +9,8 @@
 #include <QJsonArray>
 #include <QTextStream>
 
+QHash<QString, QByteArray> StorageManager::dataCache;
+
 StorageManager::StorageManager() {}
 
 StorageManager::~StorageManager() {}
@@ -645,8 +647,34 @@ bool StorageManager::beginTransaction(const QString &username, const QString &db
     QString logPath = Config::dataPath() + username + "/" + dbName + "/ruanko.log";
     QFile logFile(logPath);
 
-    // 获取写锁
     lockManager.acquireWriteLock(username, dbName, "*");
+
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
+    QString backupPath = dbPath + "_txn_backup";
+    
+    QDir backupDir(backupPath);
+    if (backupDir.exists()) {
+        backupDir.removeRecursively();
+    }
+    
+    QDir().mkpath(backupPath);
+    
+    QDir dbDir(dbPath);
+    QStringList trdFiles = dbDir.entryList(QStringList() << "*.trd", QDir::Files);
+    
+    bool backupOk = true;
+    for (const QString &file : trdFiles) {
+        if (!QFile::copy(dbPath + "/" + file, backupPath + "/" + file)) {
+            backupOk = false;
+            break;
+        }
+    }
+    
+    if (!backupOk) {
+        qDebug() << "[Storage] Failed to backup data for transaction";
+        lockManager.releaseWriteLock(username, dbName, "*");
+        return false;
+    }
 
     if (logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
         QTextStream out(&logFile);
@@ -669,8 +697,13 @@ bool StorageManager::commitTransaction(const QString &username, const QString &d
     QString logPath = Config::dataPath() + username + "/" + dbName + "/ruanko.log";
     QFile logFile(logPath);
 
-    // 获取写锁
     lockManager.acquireWriteLock(username, dbName, "*");
+
+    QString backupPath = Config::dataPath() + username + "/" + dbName + "_txn_backup";
+    QDir backupDir(backupPath);
+    if (backupDir.exists()) {
+        backupDir.removeRecursively();
+    }
 
     if (logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
         QTextStream out(&logFile);
@@ -693,8 +726,37 @@ bool StorageManager::rollbackTransaction(const QString &username, const QString 
     QString logPath = Config::dataPath() + username + "/" + dbName + "/ruanko.log";
     QFile logFile(logPath);
 
-    // 获取写锁
     lockManager.acquireWriteLock(username, dbName, "*");
+
+    QString dbPath = Config::dataPath() + username + "/" + dbName;
+    QString backupPath = dbPath + "_txn_backup";
+    
+    QDir backupDir(backupPath);
+    if (!backupDir.exists()) {
+        qDebug() << "[Storage] No transaction backup found";
+        lockManager.releaseWriteLock(username, dbName, "*");
+        return false;
+    }
+    
+    QStringList backupFiles = backupDir.entryList(QStringList() << "*.trd", QDir::Files);
+    
+    bool restoreOk = true;
+    for (const QString &file : backupFiles) {
+        QString targetFile = dbPath + "/" + file;
+        if (QFile::exists(targetFile)) {
+            QFile::remove(targetFile);
+        }
+        if (!QFile::copy(backupPath + "/" + file, targetFile)) {
+            restoreOk = false;
+            break;
+        }
+    }
+    
+    clearAllCache();
+    
+    if (restoreOk) {
+        backupDir.removeRecursively();
+    }
 
     if (logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
         QTextStream out(&logFile);
@@ -703,13 +765,17 @@ bool StorageManager::rollbackTransaction(const QString &username, const QString 
         logFile.close();
         qDebug() << QString("[Storage] Transaction rolled back for database: %1").arg(dbName);
         lockManager.releaseWriteLock(username, dbName, "*");
-        return true;
+        return restoreOk;
     } else {
         qDebug() << "[Storage] Error: Could not write to log file:" << logPath;
         lockManager.releaseWriteLock(username, dbName, "*");
         return false;
     }
+}
 
+void StorageManager::clearAllCache()
+{
+    dataCache.clear();
 }
 
 // ========================================================
