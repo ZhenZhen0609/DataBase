@@ -10,7 +10,6 @@ ComparisonNode::ComparisonNode(const QString &field, Op op, const QVariant &valu
 bool ComparisonNode::evaluate(const QJsonObject &record, const QList<Field> &fields) const {
     if (!record.contains(m_field)) return false;
     QVariant recVal = record.value(m_field).toVariant();
-    // 根据字段类型尝试转换
     for (const auto &f : fields) {
         if (f.name == m_field) {
             if (f.type == FieldType::INT) {
@@ -41,9 +40,9 @@ bool ComparisonNode::evaluate(const QJsonObject &record, const QList<Field> &fie
                 switch (m_op) {
                 case EQUAL:     return a == b;
                 case NOT_EQUAL: return a != b;
-                default: return false; // 布尔不支持 < >
+                default: return false;
                 }
-            } else { // TEXT
+            } else {
                 QString a = recVal.toString();
                 QString b = m_value.toString();
                 switch (m_op) {
@@ -66,11 +65,10 @@ bool LikeNode::evaluate(const QJsonObject &record, const QList<Field> &) const {
     if (!record.contains(m_field)) return false;
     QString value = record.value(m_field).toString();
 
-    // 将 SQL 通配符 % 和 _ 转换为正则表达式
-    QString escaped = QRegularExpression::escape(m_pattern); // 转义正则特殊字符
-    escaped.replace("\\%", ".*");   // % → .*
-    escaped.replace("\\_", ".");    // _ → .
-    QString regex = "^" + escaped + "$";   // LIKE 应匹配整个字符串
+    QString escaped = QRegularExpression::escape(m_pattern);
+    escaped.replace("\\%", ".*");
+    escaped.replace("\\_", ".");
+    QString regex = "^" + escaped + "$";
     return QRegularExpression(regex).match(value).hasMatch();
 }
 
@@ -81,7 +79,6 @@ BetweenNode::BetweenNode(const QString &field, const QVariant &low, const QVaria
 bool BetweenNode::evaluate(const QJsonObject &record, const QList<Field> &) const {
     if (!record.contains(m_field)) return false;
     QVariant val = record.value(m_field).toVariant();
-    // 统一按double比较
     double v = val.toDouble();
     return v >= m_low.toDouble() && v <= m_high.toDouble();
 }
@@ -134,17 +131,15 @@ FieldType ConditionParser::fieldTypeFromName(const QString &fieldName, const QLi
     for (const auto &f : fields) {
         if (f.name == fieldName) return f.type;
     }
-    return FieldType::TEXT; // 默认
+    return FieldType::TEXT;
 }
 
-// 使用简单的递归下降解析：将中缀表达式转为条件树，支持括号、AND/OR/NOT 和比较运算
 static int g_pos = 0;
 static QStringList g_tokens;
 static QList<Field> g_fields;
 
 static std::unique_ptr<ConditionNode> parseExpression(int prec = 0);
 
-// 消费一个token
 static QString nextToken() {
     if (g_pos < g_tokens.size()) return g_tokens[g_pos++];
     return QString();
@@ -155,7 +150,6 @@ static QString peekToken() {
     return QString();
 }
 
-// 去引号辅助函数
 static QString unquote(const QString &s) {
     if (s.length() >= 2) {
         QChar first = s.at(0);
@@ -166,7 +160,6 @@ static QString unquote(const QString &s) {
     return s;
 }
 
-// 解析原子条件：比较、LIKE、BETWEEN、IN、( expr )
 static std::unique_ptr<ConditionNode> parseAtom() {
     QString tok = nextToken();
     if (tok.isEmpty()) throw std::runtime_error("Unexpected end of condition");
@@ -181,7 +174,6 @@ static std::unique_ptr<ConditionNode> parseAtom() {
         return std::make_unique<NotNode>(std::move(node));
     }
 
-    // 字段名
     QString field = tok;
     QString op = nextToken().toUpper();
     if (op.isEmpty()) throw std::runtime_error("Missing operator after field");
@@ -197,7 +189,6 @@ static std::unique_ptr<ConditionNode> parseAtom() {
         if (nextToken().toUpper() != "AND") throw std::runtime_error("BETWEEN ... AND ... expected");
         QString val2 = nextToken();
         val2 = unquote(val2);
-        // 简单按字符串转QVariant，求值时转double
         return std::make_unique<BetweenNode>(field, val1, val2);
     }
     else if (op == "IN") {
@@ -206,15 +197,14 @@ static std::unique_ptr<ConditionNode> parseAtom() {
         while (true) {
             QString v = nextToken();
             if (v == ")") break;
-            v = unquote(v);  // 去引号
+            v = unquote(v);
             vals.append(v);
-            if (peekToken() == ",") nextToken(); // 跳过逗号
+            if (peekToken() == ",") nextToken();
             else if (peekToken() != ")") throw std::runtime_error("Expected , or )");
         }
         return std::make_unique<InNode>(field, vals);
     }
     else {
-        // 比较运算符
         ComparisonNode::Op compOp;
         if (op == "=") compOp = ComparisonNode::EQUAL;
         else if (op == "<>") compOp = ComparisonNode::NOT_EQUAL;
@@ -227,7 +217,6 @@ static std::unique_ptr<ConditionNode> parseAtom() {
         QString value = nextToken();
         value = unquote(value);
         QVariant val;
-        // 尝试转换为整数或浮点数，否则保留为字符串
         bool ok;
         int intVal = value.toInt(&ok);
         if (ok) val = intVal;
@@ -246,20 +235,19 @@ static std::unique_ptr<ConditionNode> parseExpression(int prec) {
         QString op = peekToken().toUpper();
         int p = ConditionParser::precedence(op);
         if (p <= prec) break;
-        nextToken(); // consume op
+        nextToken();
         if (op == "AND" || op == "OR") {
             LogicNode::LogicOp logicOp = (op == "AND") ? LogicNode::AND : LogicNode::OR;
             auto right = parseExpression(p);
             left = std::make_unique<LogicNode>(logicOp, std::move(left), std::move(right));
         } else {
-            putBack(); // 放回，由atom处理
+            putBack();
             break;
         }
     }
     return left;
 }
 
-// 词法分析：将条件字符串分解为token
 static QStringList tokenize(const QString &str) {
     QStringList tokens;
     QString current;
@@ -269,7 +257,7 @@ static QStringList tokenize(const QString &str) {
         if (c == '\'' || c == '"') {
             inString = !inString;
             current += c;
-            if (!inString) { // 结束字符串
+            if (!inString) {
                 tokens.append(current);
                 current.clear();
             }
@@ -288,7 +276,6 @@ static QStringList tokenize(const QString &str) {
             tokens.append(QString(c));
             continue;
         }
-        // < > = 可能组成多字符
         if (c == '<' || c == '>' || c == '=') {
             if (!current.isEmpty()) { tokens.append(current); current.clear(); }
             if (i+1 < str.length() && (str[i+1] == '>' || str[i+1] == '=')) {

@@ -27,9 +27,10 @@ void runLockManagerTests();
 void runMonitorTests();
 void runBackupTests();
 void runDMLTests();
+void runAdvancedSQLTests();
 
 // 测试开关：设为 true 则运行控制台测试后退出，false 则正常启动 GUI
-static const bool RUN_TESTS_ONLY = false;
+static const bool RUN_TESTS_ONLY = true;
 
 int main(int argc, char *argv[])
 {
@@ -50,6 +51,7 @@ int main(int argc, char *argv[])
         runMonitorTests();
         runBackupTests();
         runDMLTests();
+        runAdvancedSQLTests();
 
         return 0; // 测试完成直接退出
     }
@@ -1212,4 +1214,65 @@ void runDMLTests() {
     qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
     qDebug() << "║  阶段五 🟠橙圈B - DML & 查询引擎测试完成                        ║";
     qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+}
+
+// 阶段五新增：高级 SQL 功能测试（JOIN、UNION、视图、错误处理）
+void runAdvancedSQLTests()
+{
+    StorageManager storage;
+    SQLParser parser;
+    QueryEngine engine;
+
+    parser.setStorageManager(&storage);
+    parser.setQueryEngine(&engine);
+    parser.setCurrentUser("admin");
+
+    qDebug() << "\n╔════════════════════════════════════════════════════════════════╗";
+    qDebug() << "║  阶段五 🟠橙圈B - 高级SQL功能测试 (JOIN/UNION/VIEW/错误处理)     ║";
+    qDebug() << "╚════════════════════════════════════════════════════════════════╝";
+
+    // 准备环境
+    parser.parseSQL("CREATE DATABASE AdvancedTestDB;");
+    parser.setCurrentDatabase("AdvancedTestDB");
+    parser.parseSQL("CREATE TABLE students (id INT, name TEXT, age INT, score DOUBLE);");
+    parser.parseSQL("CREATE TABLE departments (dept_id INT, dept_name TEXT);");
+    parser.parseSQL("CREATE TABLE employees (emp_id INT, name TEXT, dept_id INT);");
+
+    parser.parseSQL("INSERT INTO students VALUES (1, 'Alice', 20, 88.5), (2, 'Bob', 22, 76.0), (3, 'Charlie', 19, 92.0), (4, 'Diana', 21, 85.5), (5, 'Alice', 23, 90.0);");
+    parser.parseSQL("INSERT INTO departments VALUES (1, '研发部'), (2, '市场部');");
+    parser.parseSQL("INSERT INTO employees VALUES (101, '张三', 1), (102, '李四', 2), (103, '王五', 1);");
+
+    // 测试 JOIN
+    qDebug() << "\n--- JOIN 测试 ---";
+    Response r1 = parser.parseSQL("SELECT e.name, d.dept_name FROM employees e JOIN departments d ON e.dept_id = d.dept_id;");
+    qDebug() << r1.message;
+    if (r1.status == ResponseStatus::OK) {
+        QJsonArray arr = QJsonDocument::fromJson(r1.data.toString().toUtf8()).array();
+        qDebug() << "返回行数:" << arr.size();
+    }
+
+    // 测试 UNION
+    qDebug() << "\n--- UNION 测试 ---";
+    Response r2 = parser.parseSQL("SELECT name FROM employees UNION SELECT name FROM students;");
+    qDebug() << r2.message;
+
+    // 测试视图
+    qDebug() << "\n--- 视图测试 ---";
+    Response r3 = parser.parseSQL("CREATE VIEW high_score AS SELECT * FROM students WHERE score >= 90;");
+    qDebug() << r3.message;
+    Response r4 = parser.parseSQL("SELECT * FROM high_score;");
+    qDebug() << r4.message;
+
+    // 测试错误处理
+    qDebug() << "\n--- 错误处理测试 ---";
+    Response r5 = parser.parseSQL("SELECT * FROM not_exist_table;");
+    qDebug() << r5.message;
+    Response r6 = parser.parseSQL("SELECT id, wrong_col FROM students;");
+    qDebug() << r6.message;
+    Response r7 = parser.parseSQL("SELECT * FROM employees JOIN departments;");
+    qDebug() << r7.message;
+
+    // 清理
+    parser.parseSQL("DROP DATABASE AdvancedTestDB;");
+    qDebug() << "\n高级 SQL 功能测试完成。";
 }

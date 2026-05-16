@@ -1,5 +1,5 @@
 ================================================================================
-                     DBMS 阶段五 🟠橙圈B SQL 测试用例集
+                     DBMS 阶段五 🟠橙圈B SQL 测试用例集（完整版）
 ================================================================================
 
 说明：
@@ -14,11 +14,13 @@
 -- 1. 创建数据库
 CREATE DATABASE DMLTestDB;
 
--- 2. 选择数据库（在 GUI 中点击左侧数据库，或在代码中设置当前数据库）
+-- 2. 选择数据库（在 GUI 中点击左侧数据库，或通过代码设置当前数据库）
 -- 注意：如果当前没有自动切换，请在 UI 或代码中设置当前数据库为 DMLTestDB
 
 -- 3. 创建测试表
 CREATE TABLE students (id INT, name TEXT, age INT, score DOUBLE);
+CREATE TABLE departments (dept_id INT, dept_name TEXT);
+CREATE TABLE employees (emp_id INT, name TEXT, dept_id INT);
 
 -- 4. 批量插入初始数据
 INSERT INTO students VALUES 
@@ -28,7 +30,11 @@ INSERT INTO students VALUES
 (4, 'Diana', 21, 85.5),
 (5, 'Alice', 23, 90.0);
 
--- 预期：插入 5 条记录，日志显示 "Inserted 5 rows"
+INSERT INTO departments VALUES (1, '研发部'), (2, '市场部');
+
+INSERT INTO employees VALUES (101, '张三', 1), (102, '李四', 2), (103, '王五', 1);
+
+-- 预期：所有表创建成功，数据插入成功
 
 ================================================================================
 二、基础 SELECT 查询
@@ -56,11 +62,11 @@ SELECT * FROM students WHERE age = 22;
 
 -- [TC05] 大于/小于条件
 SELECT * FROM students WHERE score > 85.0;
--- 预期：返回 Alice(1), Charlie, Diana, Alice(5) 共 4 行
+-- 预期：返回 4 行 (id:1,3,4,5)
 
 -- [TC06] 逻辑与 AND
 SELECT * FROM students WHERE age >= 20 AND score >= 90.0;
--- 预期：返回 Alice(1,20), Alice(5,23) 共 2 行
+-- 预期：返回 2 行 (Alice id=1 和 Alice id=5)
 
 -- [TC07] 逻辑或 OR
 SELECT * FROM students WHERE name = 'Bob' OR name = 'Charlie';
@@ -84,7 +90,7 @@ SELECT * FROM students WHERE name LIKE '%e';
 
 -- [TC11] LIKE 'A___e' （匹配 A 开头，e 结尾，中间 3 个字符）
 SELECT * FROM students WHERE name LIKE 'A___e';
--- 预期：返回 Alice 的行
+-- 预期：返回 Alice 的两行
 
 ================================================================================
 五、IN 与 BETWEEN
@@ -124,7 +130,7 @@ SELECT AVG(score), MAX(age), MIN(age) FROM students;
 
 -- [TC18] SUM
 SELECT SUM(score) FROM students;
--- 预期：432.0 (88.5+76+92+85.5+90)
+-- 预期：432.0
 
 ================================================================================
 八、GROUP BY 与 HAVING
@@ -136,7 +142,7 @@ SELECT name, COUNT(*) AS cnt FROM students GROUP BY name HAVING cnt > 1;
 
 -- [TC20] 按年龄分组求平均分，筛选均分 > 85 的组
 SELECT age, AVG(score) AS avg_score FROM students GROUP BY age HAVING avg_score > 85;
--- 预期：返回 age=19(92.0), age=20(88.5), age=23(90.0) 等（具体视数据）
+-- 预期：返回 age=19(92.0), age=20(88.5), age=23(90.0) 等
 
 ================================================================================
 九、DISTINCT 去重
@@ -190,11 +196,7 @@ INSERT INTO students VALUES (8, 'Grace', 20, 88.0), (9, 'Hank', 21, 91.0);
 UPDATE students SET score = 95.0 WHERE name = 'Alice' AND age = 20;
 -- 预期：预计更新 1 行 (id=1)
 
--- [TC30] 无条件更新（谨慎！）
--- UPDATE students SET age = age + 1;  -- 该语法可能不支持，可跳过
--- 预期：如果执行，会更新所有行的年龄
-
--- [TC31] 更新不存在的记录
+-- [TC30] 更新不存在的记录
 UPDATE students SET score = 100 WHERE name = 'Nobody';
 -- 预期：日志显示 "No rows updated"
 
@@ -202,43 +204,123 @@ UPDATE students SET score = 100 WHERE name = 'Nobody';
 十三、DELETE 删除
 ================================================================================
 
--- [TC32] 条件删除
+-- [TC31] 条件删除
 DELETE FROM students WHERE id = 9;
 -- 预期：删除 Hank 的记录
 
--- [TC33] 删除不存在的记录
+-- [TC32] 删除不存在的记录
 DELETE FROM students WHERE name = 'Ghost';
 -- 预期：日志显示 "No rows deleted"
 
--- [TC34] 删除所有记录（慎用，留作清理）
+-- [TC33] 删除所有记录（慎用，留作清理）
 -- DELETE FROM students;  -- 取消注释前请确保备份
 -- 预期：删除全部行
 
 ================================================================================
-十四、错误处理与边界测试
+十四、JOIN 连接查询
 ================================================================================
 
--- [TC35] 语法错误
-CREAT TABLE x (a INT);
--- 预期：返回错误信息，提示不支持的 SQL 指令或语法错误
+-- [TC34] INNER JOIN 等值连接
+SELECT e.name, d.dept_name FROM employees e JOIN departments d ON e.dept_id = d.dept_id;
+-- 预期：3 行，张三->研发部，李四->市场部，王五->研发部
 
--- [TC36] 缺少数据库
-CREATE TABLE no_db_table (id INT);
--- 预期：如果没有选择数据库，返回错误，提示“请先选择或创建一个数据库”
+-- [TC35] JOIN 带 WHERE 条件
+SELECT e.name, d.dept_name FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE d.dept_name = '研发部';
+-- 预期：2 行（张三、王五）
 
--- [TC37] 列数不匹配
-INSERT INTO students (id, name) VALUES (10);
--- 预期：插入失败或为缺失字段填充默认值（依实现而定，需观察）
+-- [TC36] JOIN 带 ORDER BY
+SELECT e.name, d.dept_name FROM employees e JOIN departments d ON e.dept_id = d.dept_id ORDER BY e.name DESC;
+-- 预期：按姓名降序
 
--- [TC38] 无效的聚合
-SELECT MAX(non_exist) FROM students;
--- 预期：可能返回 0 或错误
+-- [TC37] JOIN 带 LIMIT
+SELECT e.name, d.dept_name FROM employees e JOIN departments d ON e.dept_id = d.dept_id LIMIT 2;
+-- 预期：前 2 行
+
+-- [TC38] 多个 JOIN（如果需要，可以创建第三个表测试）
+-- 示例：SELECT * FROM A JOIN B ON ... JOIN C ON ...
 
 ================================================================================
-十五、环境清理
+十五、UNION 操作
 ================================================================================
 
--- 清理测试数据库（如果不需要保留）
+-- [TC39] UNION 去重
+SELECT name FROM employees UNION SELECT name FROM students;
+-- 预期：所有不重复的姓名（张三、李四、王五、Alice、Bob、Charlie、Diana、Eve、Frank等）
+
+-- [TC40] UNION ALL 保留重复
+SELECT dept_id FROM departments UNION ALL SELECT dept_id FROM employees;
+-- 预期：1,2,1,2,1（保留重复）
+
+-- [TC41] UNION 与 ORDER BY（整体排序）
+SELECT name FROM employees UNION SELECT name FROM students ORDER BY name;
+-- 预期：按姓名排序
+
+================================================================================
+十六、视图操作
+================================================================================
+
+-- [TC42] 创建视图
+CREATE VIEW high_score_students AS SELECT * FROM students WHERE score >= 90;
+-- 预期：成功
+
+-- [TC43] 查询视图
+SELECT * FROM high_score_students;
+-- 预期：返回分数≥90的学生（Charlie、Alice(id=5)）
+
+-- [TC44] 视图中使用聚合
+CREATE VIEW dept_count AS SELECT dept_name, COUNT(*) AS cnt FROM employees JOIN departments USING(dept_id) GROUP BY dept_name;
+SELECT * FROM dept_count;
+-- 预期：研发部->2，市场部->1
+
+-- [TC45] 删除视图
+DROP VIEW high_score_students;
+-- 预期：成功
+
+-- [TC46] 删除不存在的视图
+DROP VIEW not_exist_view;
+-- 预期：[SQL错误] 视图不存在
+
+================================================================================
+十七、错误处理与语义检查
+================================================================================
+
+-- [TC47] 语法错误：缺少括号
+CREATE TABLE test (id INT name TEXT);
+-- 预期：[SQL错误] 行1 列XX: 期望 ')'，实际 'name'
+
+-- [TC48] 语法错误：CREATE TABLE 缺字段定义
+CREATE TABLE test2;
+-- 预期：[SQL错误] 缺少字段定义括号
+
+-- [TC49] 语义错误：表不存在
+SELECT * from unknown_table;
+-- 预期：[SQL错误] 表 'unknown_table' 不存在
+
+-- [TC50] 语义错误：字段不存在
+SELECT id, non_exist_col FROM students;
+-- 预期：[SQL错误] 字段 'non_exist_col' 不存在于表 'students'
+
+-- [TC51] JOIN 缺少 ON 条件
+SELECT * FROM employees JOIN departments;
+-- 预期：[SQL错误] Invalid JOIN syntax 或 JOIN 缺少 ON 条件
+
+-- [TC52] UNION 两侧列数不匹配（本系统可能允许，但应有警告）
+SELECT name FROM employees UNION SELECT id, name FROM students;
+-- 预期：错误或警告列数不匹配
+
+-- [TC53] 视图定义中引用不存在的表
+CREATE VIEW bad_view AS SELECT * from not_exist_table;
+-- 预期：视图定义无效，提示表不存在
+
+-- [TC54] 递归视图（自引用）限制深度
+CREATE VIEW recursive_view AS SELECT * FROM recursive_view;
+-- 预期：警告或错误，或深度限制防止栈溢出
+
+================================================================================
+十八、环境清理
+================================================================================
+
+-- 删除所有测试数据（如果不保留）
 DROP DATABASE DMLTestDB;
 -- 预期：数据库删除成功
 

@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cmath>
 #include <QtGlobal>
+#include <QFile>
+#include <QDir>
 
 QueryEngine::QueryEngine(QObject *parent) : QObject(parent) {}
 
@@ -36,7 +38,6 @@ Response QueryEngine::rewriteTable(const QString &tableName, const QJsonArray &r
     return m_record.replaceAllRecords(m_currentUser, m_currentDb, tableName, records);
 }
 
-// 提取聚合函数名与字段名，支持 COUNT(*)
 static QString extractAggFunc(const QString &colExpr, QString &funcName, QString &fieldName) {
     QRegularExpression re(R"(^(\w+)\s*\(\s*(\*|\w+)\s*\)$)");
     auto match = re.match(colExpr.trimmed());
@@ -55,16 +56,12 @@ QVariant QueryEngine::computeAggregate(const QString &funcName, const QJsonArray
         return groupRecords.size();
     }
     if (groupRecords.isEmpty()) return QVariant();
-
-    if (fieldName == "*") {
-        return QVariant();
-    }
+    if (fieldName == "*") return QVariant();
 
     QVector<double> values;
     for (const QJsonValue &v : groupRecords) {
         QJsonObject obj = v.toObject();
         if (obj.contains(fieldName)) {
-            // 直接 toDouble()，QJsonValue 会自动将字符串或数字转换为 double
             double val = obj[fieldName].toDouble();
             values.append(val);
         }
@@ -87,25 +84,18 @@ QVariant QueryEngine::computeAggregate(const QString &funcName, const QJsonArray
     return QVariant();
 }
 
+// 原有的 executeSelect
 Response QueryEngine::executeSelect(const QString &tableName, const QStringList &columns,
                                     const QString &whereClause, const QString &orderBy,
                                     const QStringList &groupBy, const QString &having,
                                     int limit, int offset, bool distinct)
 {
-    qDebug() << QString("[QueryEngine] executeSelect: table=%1 cols=%2 user=%3 db=%4")
-                .arg(tableName).arg(columns.join(",")).arg(m_currentUser).arg(m_currentDb);
-
+    qDebug() << "[QueryEngine] executeSelect:" << tableName;
     QList<Field> fields;
     QJsonArray records;
     Response err;
-    if (!loadTableData(tableName, fields, records, err)) {
-        qDebug() << QString("[QueryEngine] executeSelect: loadTableData FAILED: %1").arg(err.message);
-        return err;
-    }
+    if (!loadTableData(tableName, fields, records, err)) return err;
 
-    qDebug() << QString("[QueryEngine] executeSelect: loaded %1 fields, %2 raw records").arg(fields.size()).arg(records.size());
-
-    // 1. WHERE 过滤
     if (!whereClause.isEmpty()) {
         auto cond = ConditionParser::parse(whereClause);
         if (!cond) return {ResponseStatus::ERROR, "Failed to parse WHERE clause", QVariant()};
@@ -117,7 +107,6 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
         records = filtered;
     }
 
-    // 2. 检查聚合函数
     bool hasAgg = false;
     for (const QString &col : columns) {
         if (col.trimmed().compare("*", Qt::CaseInsensitive) == 0) continue;
@@ -126,7 +115,6 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
         if (!func.isEmpty()) { hasAgg = true; break; }
     }
 
-    // GROUP BY / 聚合处理
     if (!groupBy.isEmpty() || hasAgg) {
         QMap<QString, QJsonArray> groups;
         for (const auto &val : records) {
@@ -136,10 +124,8 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
                 QJsonValue gv = obj.value(gb);
                 if (gv.isDouble()) {
                     double dv = gv.toDouble();
-                    if (dv == (int)dv)
-                        keyParts << QString::number((int)dv);
-                    else
-                        keyParts << QString::number(dv, 'f', 2);
+                    if (dv == (int)dv) keyParts << QString::number((int)dv);
+                    else keyParts << QString::number(dv, 'f', 2);
                 } else {
                     keyParts << gv.toString();
                 }
@@ -181,47 +167,35 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
         records = result;
     }
 
-    // 3. ORDER BY
     if (!orderBy.isEmpty()) {
         QStringList parts = orderBy.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
         QString sortField = parts.value(0);
         bool desc = (parts.size() > 1 && parts[1].toUpper() == "DESC");
-
         QVector<QJsonValue> vecRecords;
-        for (const QJsonValue &v : records)
-            vecRecords.append(v);
-
+        for (const QJsonValue &v : records) vecRecords.append(v);
         std::sort(vecRecords.begin(), vecRecords.end(),
                   [&](const QJsonValue &a, const QJsonValue &b) {
                       QJsonObject oa = a.toObject(), ob = b.toObject();
                       QVariant va = oa.value(sortField).toVariant();
                       QVariant vb = ob.value(sortField).toVariant();
-                      if (desc)
-                          return va.toString() > vb.toString();
-                      else
-                          return va.toString() < vb.toString();
+                      if (desc) return va.toString() > vb.toString();
+                      else return va.toString() < vb.toString();
                   });
-
         records = QJsonArray();
-        for (const QJsonValue &v : vecRecords)
-            records.append(v);
+        for (const QJsonValue &v : vecRecords) records.append(v);
     }
 
-    // 4. 投影列
     if (!columns.isEmpty() && !(columns.size()==1 && columns[0].trimmed()=="*")) {
         QJsonArray projected;
         for (const auto &val : records) {
             QJsonObject obj = val.toObject();
             QJsonObject row;
-            for (const QString &col : columns) {
-                row[col] = obj.contains(col) ? obj[col] : obj[col];
-            }
+            for (const QString &col : columns) row[col] = obj[col];
             projected.append(row);
         }
         records = projected;
     }
 
-    // 5. DISTINCT
     if (distinct) {
         QJsonArray unique;
         QSet<QString> seen;
@@ -236,21 +210,15 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
         records = unique;
     }
 
-    // 6. LIMIT / OFFSET
     if (offset > 0 || limit >= 0) {
         QJsonArray sliced;
         int start = qMin(offset, records.size());
         int end = records.size();
-        if (limit >= 0) {
-            end = qMin(start + limit, records.size());
-        }
-        for (int i = start; i < end; ++i) {
-            sliced.append(records[i]);
-        }
+        if (limit >= 0) end = qMin(start + limit, records.size());
+        for (int i = start; i < end; ++i) sliced.append(records[i]);
         records = sliced;
     }
 
-    qDebug() << QString("[QueryEngine] executeSelect: returning %1 rows").arg(records.size());
     QJsonDocument resultDoc(records);
     QString jsonStr = QString::fromUtf8(resultDoc.toJson(QJsonDocument::Compact));
     return {ResponseStatus::OK, QString("Selected %1 rows").arg(records.size()), QVariant(jsonStr)};
@@ -263,12 +231,9 @@ Response QueryEngine::executeInsert(const QString &tableName, const QStringList 
     if (res.status != ResponseStatus::OK) return res;
     TableSchema schema = res.data.value<TableSchema>();
 
-    // 修复：未指定列名时自动按表结构顺序填充
     QStringList effectiveColNames = colNames;
     if (effectiveColNames.isEmpty()) {
-        for (const Field &f : schema.fields) {
-            effectiveColNames.append(f.name);
-        }
+        for (const Field &f : schema.fields) effectiveColNames.append(f.name);
     }
 
     int count = 0;
@@ -287,18 +252,13 @@ Response QueryEngine::executeInsert(const QString &tableName, const QStringList 
 Response QueryEngine::executeUpdate(const QString &tableName, const QJsonObject &assignments,
                                     const QString &whereClause)
 {
-    qDebug() << "[UPDATE] START: table=" << tableName << " user=" << m_currentUser << " db=" << m_currentDb;
-
+    qDebug() << "[UPDATE] START: table=" << tableName;
     StorageManager storage;
     QList<Field> fields = storage.loadTableSchema(m_currentUser, m_currentDb, tableName);
-    if (fields.isEmpty()) {
-        return {ResponseStatus::TABLE_NOT_FOUND, "Table not found: " + tableName, QVariant()};
-    }
+    if (fields.isEmpty()) return {ResponseStatus::TABLE_NOT_FOUND, "Table not found: " + tableName, QVariant()};
 
     QString pkField = "id";
-    for (const Field &f : fields) {
-        if (f.isPrimaryKey) { pkField = f.name; break; }
-    }
+    for (const Field &f : fields) if (f.isPrimaryKey) { pkField = f.name; break; }
 
     QByteArray raw = storage.readTableData(m_currentUser, m_currentDb, tableName);
     QJsonArray allRecords;
@@ -331,8 +291,6 @@ Response QueryEngine::executeUpdate(const QString &tableName, const QJsonObject 
         }
     }
 
-    qDebug() << "[UPDATE] loaded" << allRecords.size() << "records";
-
     std::unique_ptr<ConditionNode> cond;
     if (!whereClause.trimmed().isEmpty()) {
         cond = ConditionParser::parse(whereClause.trimmed());
@@ -342,20 +300,15 @@ Response QueryEngine::executeUpdate(const QString &tableName, const QJsonObject 
     QList<QJsonObject> finalRecords;
     QStringList updatedPks;
     int count = 0;
-
     for (const QJsonValue &v : allRecords) {
         QJsonObject obj = v.toObject();
         if (!cond || cond->evaluate(obj, fields)) {
-            for (const QString &key : assignments.keys()) {
-                obj[key] = assignments[key];
-            }
+            for (const QString &key : assignments.keys()) obj[key] = assignments[key];
             updatedPks.append(obj[pkField].toVariant().toString());
             count++;
         }
         finalRecords.append(obj);
     }
-
-    qDebug() << "[UPDATE] updated" << count << "records";
 
     if (count == 0) return {ResponseStatus::OK, "No rows updated", QVariant()};
 
@@ -393,31 +346,19 @@ Response QueryEngine::executeUpdate(const QString &tableName, const QJsonObject 
             ds.writeRawData(chunk.data(), s);
         }
     }
-
     storage.writeTableData(m_currentUser, m_currentDb, tableName, newData);
-    qDebug() << "[UPDATE] DONE, wrote" << finalRecords.size() << "records";
     return {ResponseStatus::OK, QString("Updated %1 rows").arg(count), QVariant()};
 }
 
 Response QueryEngine::executeDelete(const QString &tableName, const QString &whereClause)
 {
-    qDebug() << "========================================";
-    qDebug() << "[DELETE] START: table=" << tableName << "user=" << m_currentUser << "db=" << m_currentDb;
-    qDebug() << "[DELETE] WHERE raw=[" << whereClause << "]";
-
+    qDebug() << "[DELETE] START: table=" << tableName;
     StorageManager storage;
-
     QList<Field> fields = storage.loadTableSchema(m_currentUser, m_currentDb, tableName);
-    if (fields.isEmpty()) {
-        qDebug() << "[DELETE] FAIL: unknown table";
-        return {ResponseStatus::TABLE_NOT_FOUND, "Table not found: " + tableName, QVariant()};
-    }
+    if (fields.isEmpty()) return {ResponseStatus::TABLE_NOT_FOUND, "Table not found: " + tableName, QVariant()};
 
     QString pkField = "id";
-    for (const Field &f : fields) {
-        if (f.isPrimaryKey) { pkField = f.name; break; }
-    }
-    qDebug() << "[DELETE] pkField=" << pkField << " fields=" << fields.size();
+    for (const Field &f : fields) if (f.isPrimaryKey) { pkField = f.name; break; }
 
     QByteArray raw = storage.readTableData(m_currentUser, m_currentDb, tableName);
     QJsonArray allRecords;
@@ -442,59 +383,31 @@ Response QueryEngine::executeDelete(const QString &tableName, const QString &whe
                 }
             }
             QString ca; rs >> ca; obj["_created_at"] = ca;
-
             for (const Field &f : fields) {
-                if (f.isEncrypted && obj.contains(f.name)) {
+                if (f.isEncrypted && obj.contains(f.name))
                     obj[f.name] = ConstraintManager::decrypt(obj[f.name].toString());
-                }
             }
-
             allRecords.append(obj);
         }
-    }
-    qDebug() << "[DELETE] loaded" << allRecords.size() << "records from disk";
-    for (int i = 0; i < allRecords.size(); ++i) {
-        QJsonObject r = allRecords[i].toObject();
-        qDebug() << "[DELETE]   rec[" << i << "] pk=" << r[pkField].toVariant().toString();
     }
 
     QList<QJsonObject> remaining;
     QStringList deletedPks;
-
     if (whereClause.trimmed().isEmpty()) {
-        qDebug() << "[DELETE] WARNING: no WHERE clause, deleting ALL";
-        for (const QJsonValue &v : allRecords) {
-            deletedPks.append(v.toObject()[pkField].toVariant().toString());
-        }
+        for (const QJsonValue &v : allRecords) deletedPks.append(v.toObject()[pkField].toVariant().toString());
     } else {
         auto cond = ConditionParser::parse(whereClause.trimmed());
-        if (!cond) {
-            qDebug() << "[DELETE] FAIL: WHERE parse error";
-            return {ResponseStatus::ERROR, "WHERE parse failed: " + whereClause, QVariant()};
-        }
-
+        if (!cond) return {ResponseStatus::ERROR, "WHERE parse failed: " + whereClause, QVariant()};
         for (const QJsonValue &v : allRecords) {
             QJsonObject obj = v.toObject();
-            bool hit = cond->evaluate(obj, fields);
-            QString pk = obj[pkField].toVariant().toString();
-            qDebug() << "[DELETE] eval pk=" << pk << " => match=" << hit;
-            if (hit) {
-                deletedPks.append(pk);
-            } else {
-                remaining.append(obj);
-            }
+            if (cond->evaluate(obj, fields)) deletedPks.append(obj[pkField].toVariant().toString());
+            else remaining.append(obj);
         }
     }
 
-    qDebug() << "[DELETE] toDelete=" << deletedPks.size() << " remaining=" << remaining.size();
-
-    if (deletedPks.isEmpty()) {
-        qDebug() << "[DELETE] DONE: nothing to delete";
-        return {ResponseStatus::OK, "No rows deleted", QVariant()};
-    }
+    if (deletedPks.isEmpty()) return {ResponseStatus::OK, "No rows deleted", QVariant()};
 
     for (const QString &pk : deletedPks) {
-        qDebug() << "[DELETE] cascading for pk=" << pk;
         ConstraintManager::cascadeDelete(m_currentUser, m_currentDb, tableName, pk);
     }
 
@@ -505,11 +418,9 @@ Response QueryEngine::executeDelete(const QString &tableName, const QString &whe
         for (const QJsonObject &obj : remaining) {
             QJsonObject encObj = obj;
             for (const Field &f : fields) {
-                if (f.isEncrypted && encObj.contains(f.name)) {
+                if (f.isEncrypted && encObj.contains(f.name))
                     encObj[f.name] = ConstraintManager::encrypt(encObj[f.name].toString());
-                }
             }
-
             QByteArray chunk;
             QDataStream rs(&chunk, QIODevice::WriteOnly);
             rs.setByteOrder(QDataStream::LittleEndian);
@@ -530,13 +441,255 @@ Response QueryEngine::executeDelete(const QString &tableName, const QString &whe
             ds.writeRawData(chunk.data(), s);
         }
     }
-
     bool ok = storage.writeTableData(m_currentUser, m_currentDb, tableName, newData);
-    qDebug() << "[DELETE] wrote" << remaining.size() << "records, ok=" << ok;
-    qDebug() << "========================================";
-
-    if (!ok) {
-        return {ResponseStatus::ERROR, "Write failed", QVariant()};
-    }
+    if (!ok) return {ResponseStatus::ERROR, "Write failed", QVariant()};
     return {ResponseStatus::OK, QString("Deleted %1 rows").arg(deletedPks.size()), QVariant()};
+}
+
+// ========================= JOIN 实现（支持别名） =========================
+Response QueryEngine::executeJoinSelect(const QString &sql)
+{
+    // 匹配：SELECT ... FROM table1 [alias1] JOIN table2 [alias2] ON condition
+    QRegularExpression joinRe(R"(SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(\w+))?\s+JOIN\s+(\w+)(?:\s+(\w+))?\s+ON\s+(.+?)(?=\s+(?:JOIN|WHERE|ORDER\s+BY|LIMIT|$))?)",
+                              QRegularExpression::CaseInsensitiveOption);
+    auto match = joinRe.match(sql);
+    if (!match.hasMatch()) {
+        return {ResponseStatus::ERROR, "Invalid JOIN syntax", QVariant()};
+    }
+
+    QString columnsPart = match.captured(1).trimmed();
+    QString table1Name = match.captured(2).trimmed();
+    QString table1Alias = match.captured(3).trimmed();
+    QString table2Name = match.captured(4).trimmed();
+    QString table2Alias = match.captured(5).trimmed();
+    QString onCondition = match.captured(6).trimmed();
+    QString remaining = sql.mid(match.capturedEnd()).trimmed();
+
+    // 加载两个表的数据（使用真实表名）
+    QList<Field> fields1, fields2;
+    QJsonArray records1, records2;
+    Response err;
+    if (!loadTableData(table1Name, fields1, records1, err)) return err;
+    if (!loadTableData(table2Name, fields2, records2, err)) return err;
+
+    // 将 ON 条件中的别名替换为真实字段名（简单替换）
+    QString actualOn = onCondition;
+    if (!table1Alias.isEmpty()) {
+        actualOn.replace(QRegularExpression("\\b" + table1Alias + "\\."), "");
+    }
+    if (!table2Alias.isEmpty()) {
+        actualOn.replace(QRegularExpression("\\b" + table2Alias + "\\."), "");
+    }
+    auto cond = ConditionParser::parse(actualOn);
+    if (!cond) {
+        return {ResponseStatus::ERROR, "Failed to parse JOIN ON condition: " + onCondition, QVariant()};
+    }
+
+    // 构建合并字段列表（处理重名）
+    QList<Field> allFields = fields1;
+    for (const Field &f : fields2) {
+        bool dup = false;
+        for (const Field &f1 : fields1) if (f1.name == f.name) { dup = true; break; }
+        if (dup) {
+            Field renamed = f;
+            renamed.name = table2Name + "." + f.name;
+            allFields.append(renamed);
+        } else {
+            allFields.append(f);
+        }
+    }
+
+    // 笛卡尔积 + ON 过滤
+    QJsonArray resultRecords;
+    for (const QJsonValue &v1 : records1) {
+        QJsonObject obj1 = v1.toObject();
+        for (const QJsonValue &v2 : records2) {
+            QJsonObject obj2 = v2.toObject();
+            QJsonObject merged;
+            for (const Field &f : fields1) merged[f.name] = obj1[f.name];
+            for (const Field &f : fields2) {
+                QString key = f.name;
+                for (const Field &f1 : fields1) if (f1.name == f.name) { key = table2Name + "." + f.name; break; }
+                merged[key] = obj2[f.name];
+            }
+            if (cond->evaluate(merged, allFields)) resultRecords.append(merged);
+        }
+    }
+
+    // 处理剩余的 WHERE, ORDER BY, LIMIT
+    if (!remaining.isEmpty()) {
+        QRegularExpression whereRe("\\bWHERE\\b\\s+(.+?)(?=\\b(ORDER\\s+BY|LIMIT)\\b|$)", QRegularExpression::CaseInsensitiveOption);
+        auto whereMatch = whereRe.match(remaining);
+        QString whereClause;
+        if (whereMatch.hasMatch()) whereClause = whereMatch.captured(1).trimmed();
+
+        QRegularExpression orderRe("\\bORDER\\s+BY\\b\\s+(.+?)(?=\\b(LIMIT)\\b|$)", QRegularExpression::CaseInsensitiveOption);
+        auto orderMatch = orderRe.match(remaining);
+        QString orderBy;
+        if (orderMatch.hasMatch()) orderBy = orderMatch.captured(1).trimmed();
+
+        QRegularExpression limitRe("\\bLIMIT\\b\\s+(\\d+)(?:\\s+OFFSET\\s+(\\d+))?", QRegularExpression::CaseInsensitiveOption);
+        auto limitMatch = limitRe.match(remaining);
+        int limit = -1, offset = 0;
+        if (limitMatch.hasMatch()) {
+            limit = limitMatch.captured(1).toInt();
+            if (!limitMatch.captured(2).isEmpty()) offset = limitMatch.captured(2).toInt();
+        }
+
+        if (!whereClause.isEmpty()) {
+            auto whereCond = ConditionParser::parse(whereClause);
+            if (!whereCond) return {ResponseStatus::ERROR, "Failed to parse WHERE clause after JOIN", QVariant()};
+            QJsonArray filtered;
+            for (const auto &val : resultRecords) {
+                QJsonObject obj = val.toObject();
+                if (whereCond->evaluate(obj, allFields)) filtered.append(obj);
+            }
+            resultRecords = filtered;
+        }
+
+        if (!orderBy.isEmpty()) {
+            QStringList parts = orderBy.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+            QString sortField = parts.value(0);
+            bool desc = (parts.size() > 1 && parts[1].toUpper() == "DESC");
+            QVector<QJsonValue> vec;
+            for (const QJsonValue &v : resultRecords) vec.append(v);
+            std::sort(vec.begin(), vec.end(),
+                      [&](const QJsonValue &a, const QJsonValue &b) {
+                          QVariant va = a.toObject().value(sortField).toVariant();
+                          QVariant vb = b.toObject().value(sortField).toVariant();
+                          if (desc) return va.toString() > vb.toString();
+                          else return va.toString() < vb.toString();
+                      });
+            resultRecords = QJsonArray();
+            for (const QJsonValue &v : vec) resultRecords.append(v);
+        }
+
+        if (offset > 0 || limit >= 0) {
+            QJsonArray sliced;
+            int start = qMin(offset, resultRecords.size());
+            int end = resultRecords.size();
+            if (limit >= 0) end = qMin(start + limit, resultRecords.size());
+            for (int i = start; i < end; ++i) sliced.append(resultRecords[i]);
+            resultRecords = sliced;
+        }
+    }
+
+    // 投影指定的列（支持表别名.列名）
+    if (columnsPart != "*") {
+        QStringList cols = columnsPart.split(',', Qt::SkipEmptyParts);
+        for (QString &c : cols) c = c.trimmed();
+        QJsonArray projected;
+        for (const QJsonValue &val : resultRecords) {
+            QJsonObject obj = val.toObject();
+            QJsonObject row;
+            for (const QString &c : cols) {
+                // 处理形如 "e.name" 的列引用
+                QString colName = c;
+                if (colName.contains('.')) {
+                    colName = colName.split('.').last();
+                }
+                row[c] = obj[colName];
+            }
+            projected.append(row);
+        }
+        resultRecords = projected;
+    }
+
+    QJsonDocument doc(resultRecords);
+    QString jsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
+    return {ResponseStatus::OK, QString("JOIN returned %1 rows").arg(resultRecords.size()), QVariant(jsonStr)};
+}
+
+// ========================= UNION 实现 =========================
+Response QueryEngine::executeUnion(const QString &leftSql, const QString &rightSql, bool distinct)
+{
+    // 此函数保留给未来可能需要直接调用的场景，目前 UNION 由 SQLParser 处理并调用 mergeUnion
+    return {ResponseStatus::ERROR, "executeUnion should not be called directly; use mergeUnion instead", QVariant()};
+}
+
+Response QueryEngine::mergeUnion(const QJsonArray &leftRows, const QJsonArray &rightRows, bool distinct)
+{
+    QJsonArray result = leftRows;
+    for (const QJsonValue &v : rightRows) result.append(v);
+    if (distinct) {
+        QSet<QString> seen;
+        QJsonArray unique;
+        for (const QJsonValue &v : result) {
+            QString key = QJsonDocument(v.toObject()).toJson(QJsonDocument::Compact);
+            if (!seen.contains(key)) {
+                seen.insert(key);
+                unique.append(v);
+            }
+        }
+        result = unique;
+    }
+    QJsonDocument doc(result);
+    QString jsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
+    return {ResponseStatus::OK, QString("UNION returned %1 rows").arg(result.size()), QVariant(jsonStr)};
+}
+
+// ========================= 视图实现 =========================
+Response QueryEngine::executeCreateView(const QString &viewName, const QString &selectSql)
+{
+    if (m_currentUser.isEmpty() || m_currentDb.isEmpty()) {
+        return {ResponseStatus::ERROR, "Not logged in or no database selected", QVariant()};
+    }
+    QString viewsPath = Config::dataPath() + m_currentUser + "/" + m_currentDb + "/views.json";
+    QFile file(viewsPath);
+    QJsonObject views;
+    if (file.exists()) {
+        if (!file.open(QIODevice::ReadOnly)) return {ResponseStatus::ERROR, "Cannot read views.json", QVariant()};
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (doc.isObject()) views = doc.object();
+        file.close();
+    }
+    views[viewName] = selectSql;
+    if (!file.open(QIODevice::WriteOnly)) return {ResponseStatus::ERROR, "Cannot write views.json", QVariant()};
+    file.write(QJsonDocument(views).toJson(QJsonDocument::Indented));
+    file.close();
+    return {ResponseStatus::OK, QString("View '%1' created successfully").arg(viewName), QVariant()};
+}
+
+Response QueryEngine::executeDropView(const QString &viewName)
+{
+    QString viewsPath = Config::dataPath() + m_currentUser + "/" + m_currentDb + "/views.json";
+    QFile file(viewsPath);
+    if (!file.exists()) return {ResponseStatus::ERROR, "No views exist", QVariant()};
+    if (!file.open(QIODevice::ReadOnly)) return {ResponseStatus::ERROR, "Cannot read views.json", QVariant()};
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();
+    if (!doc.isObject()) return {ResponseStatus::ERROR, "Invalid views.json", QVariant()};
+    QJsonObject views = doc.object();
+    if (!views.contains(viewName)) return {ResponseStatus::ERROR, QString("View '%1' not found").arg(viewName), QVariant()};
+    views.remove(viewName);
+    if (!file.open(QIODevice::WriteOnly)) return {ResponseStatus::ERROR, "Cannot write views.json", QVariant()};
+    file.write(QJsonDocument(views).toJson(QJsonDocument::Indented));
+    file.close();
+    return {ResponseStatus::OK, QString("View '%1' dropped").arg(viewName), QVariant()};
+}
+
+QString QueryEngine::expandView(const QString &viewName, int depth)
+{
+    if (depth > 5) return QString();
+    QString viewsPath = Config::dataPath() + m_currentUser + "/" + m_currentDb + "/views.json";
+    QFile file(viewsPath);
+    if (!file.exists()) return QString();
+    if (!file.open(QIODevice::ReadOnly)) return QString();
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();
+    if (!doc.isObject()) return QString();
+    QJsonObject views = doc.object();
+    if (!views.contains(viewName)) return QString();
+    QString selectSql = views[viewName].toString();
+    QRegularExpression viewRefRe(R"(\bFROM\s+(\w+)\b)", QRegularExpression::CaseInsensitiveOption);
+    auto it = viewRefRe.globalMatch(selectSql);
+    while (it.hasNext()) {
+        auto match = it.next();
+        QString refView = match.captured(1);
+        QString expanded = expandView(refView, depth+1);
+        if (!expanded.isEmpty()) {
+            selectSql.replace(match.capturedStart(), match.capturedLength(), "FROM (" + expanded + ") AS " + refView);
+        }
+    }
+    return selectSql;
 }
