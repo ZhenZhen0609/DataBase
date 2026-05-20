@@ -265,8 +265,7 @@ Response QueryEngine::executeSelect(const QString &tableName, const QStringList 
     }
 
     QJsonDocument resultDoc(records);
-    QString jsonStr = QString::fromUtf8(resultDoc.toJson(QJsonDocument::Compact));
-    return {ResponseStatus::OK, QString("Selected %1 rows").arg(records.size()), QVariant(jsonStr)};
+    return {ResponseStatus::OK, QString("Selected %1 rows").arg(records.size()), QVariant::fromValue(records)};
 }
 
 Response QueryEngine::executeInsert(const QString &tableName, const QStringList &colNames,
@@ -697,8 +696,7 @@ Response QueryEngine::executeJoinSelect(const QString &sql)
     }
 
     QJsonDocument doc(resultRecords);
-    QString jsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
-    return {ResponseStatus::OK, QString("JOIN returned %1 rows").arg(resultRecords.size()), QVariant(jsonStr)};
+    return {ResponseStatus::OK, QString("JOIN returned %1 rows").arg(resultRecords.size()), QVariant::fromValue(resultRecords)};
 }
 
 // ========================= UNION 实现 =========================
@@ -725,8 +723,7 @@ Response QueryEngine::mergeUnion(const QJsonArray &leftRows, const QJsonArray &r
         result = unique;
     }
     QJsonDocument doc(result);
-    QString jsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
-    return {ResponseStatus::OK, QString("UNION returned %1 rows").arg(result.size()), QVariant(jsonStr)};
+    return {ResponseStatus::OK, QString("UNION returned %1 rows").arg(result.size()), QVariant::fromValue(result)};
 }
 
 // ========================= 事务管理 =========================

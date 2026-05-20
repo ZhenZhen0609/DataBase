@@ -1,3 +1,4 @@
+//条件解析器，WHERE子句解析、条件表达式树构建（Comparison/Like/Between/In/Logic/Not节点）、条件求值
 #include "conditionparser.h"
 #include <QRegularExpression>
 #include <QStack>

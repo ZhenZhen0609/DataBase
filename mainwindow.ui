@@ -39,11 +39,12 @@ QLineEdit:focus, QTextEdit:focus {
 QPushButton {
     background-color: #313244;
     border: 1px solid #45475a;
-    border-radius: 6px;
-    padding: 8px 16px;
+    border-radius: 4px;
+    padding: 4px 8px;
     color: #cdd6f4;
-    min-width: 80px;
-    min-height: 36px;
+    min-width: 60px;
+    min-height: 24px;
+    font-size: 12px;
 }
 
 QPushButton:hover {
@@ -55,7 +56,8 @@ QPushButton:pressed {
 }
 
 QLineEdit {
-    min-height: 36px;
+    min-height: 24px;
+    font-size: 12px;
 }
 
 QPushButton#btnLogin {
@@ -100,13 +102,13 @@ QTreeWidget {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 6px;
-    padding: 8px;
+    padding: 4px;
     color: #cdd6f4;
     show-decoration-selected: 1;
 }
 
 QTreeWidget::item {
-    padding: 6px;
+    padding: 2px;
 }
 
 QTreeWidget::item:hover {
@@ -127,7 +129,7 @@ QTableWidget {
 }
 
 QTableWidget::item {
-    padding: 6px;
+    padding: 2px;
 }
 
 QTableWidget::item:selected {
@@ -138,7 +140,7 @@ QTableWidget::item:selected {
 QHeaderView::section {
     background-color: #45475a;
     color: #cdd6f4;
-    padding: 8px;
+    padding: 4px;
     border: none;
     font-weight: bold;
 }
@@ -152,7 +154,7 @@ QTabWidget::pane {
 QTabBar::tab {
     background-color: #313244;
     color: #cdd6f4;
-    padding: 10px 20px;
+    padding: 6px 12px;
     border: none;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
@@ -261,7 +263,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
             </font>
            </property>
            <property name="text">
-            <string>📦</string>
+            <string>[DB]</string>
            </property>
           </widget>
          </item>
@@ -291,10 +293,48 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
            </property>
           </spacer>
          </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="topRow2Layout">
+         <item>
+          <widget class="QLabel" name="labelDb">
+           <property name="text">
+            <string>📦</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="inputDbName">
+           <property name="maximumSize">
+            <size>
+             <width>150</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="placeholderText">
+            <string>数据库名</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnCreateDb">
+           <property name="text">
+            <string>创建数据库</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnDropDb">
+           <property name="text">
+            <string>删除数据库</string>
+           </property>
+          </widget>
+         </item>
          <item>
           <widget class="QLabel" name="labelUser">
            <property name="text">
-            <string>👤</string>
+            <string>用户:</string>
            </property>
           </widget>
          </item>
@@ -351,57 +391,6 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
             <string>未登录</string>
            </property>
           </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="topRow2Layout">
-         <item>
-          <widget class="QLabel" name="labelDb">
-           <property name="text">
-            <string>📦</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="inputDbName">
-           <property name="maximumSize">
-            <size>
-             <width>150</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="placeholderText">
-            <string>数据库名</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnCreateDb">
-           <property name="text">
-            <string>创建数据库</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnDropDb">
-           <property name="text">
-            <string>删除数据库</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="topToolbarSpacer">
-           <property name="orientation">
-            <enum>Qt::Orientation::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>20</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
          </item>
         </layout>
        </item>
@@ -471,14 +460,14 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
             <item>
              <widget class="QPushButton" name="btnCreateTable">
               <property name="text">
-               <string>📋 新建表</string>
+               <string>新建表</string>
               </property>
              </widget>
             </item>
             <item>
              <widget class="QPushButton" name="btnDropTable">
               <property name="text">
-               <string>🗑️ 删除表</string>
+               <string>删除表</string>
               </property>
              </widget>
             </item>
@@ -488,7 +477,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
          <item>
           <widget class="QPushButton" name="btnAlterTable">
            <property name="text">
-            <string>✏️ 修改表</string>
+            <string>修改表</string>
            </property>
           </widget>
          </item>
@@ -526,14 +515,14 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
             <item row="0" column="1">
              <widget class="QPushButton" name="btnDropField">
               <property name="text">
-               <string>➖ 删除字段</string>
+               <string>删除字段</string>
               </property>
              </widget>
             </item>
             <item row="0" column="0">
              <widget class="QPushButton" name="btnAddField">
               <property name="text">
-               <string>➕ 添加字段</string>
+               <string>添加字段</string>
               </property>
              </widget>
             </item>
@@ -543,7 +532,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
          <item>
           <widget class="QPushButton" name="btnAlterField">
            <property name="text">
-            <string>✏️ 修改字段</string>
+            <string>修改字段</string>
            </property>
           </widget>
          </item>
@@ -595,49 +584,49 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
               <item>
                <widget class="QPushButton" name="btnInsertRecord">
                 <property name="text">
-                 <string>➕ 插入</string>
+                 <string>插入</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="btnRefreshData">
                 <property name="text">
-                 <string>🔄 刷新数据</string>
+                 <string>刷新数据</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="btnRefreshSchema">
                 <property name="text">
-                 <string>📋 刷新结构</string>
+                 <string>刷新结构</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="btnAddRow">
                 <property name="text">
-                 <string>➕ 新增行</string>
+                 <string>新增行</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="btnDeleteRow">
                 <property name="text">
-                 <string>🗑️ 删除行</string>
+                 <string>删除行</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="btnSaveTable">
                 <property name="text">
-                 <string>💾 保存修改</string>
+                 <string>保存修改</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="btnShowChart">
                 <property name="text">
-                 <string>📊 统计图表</string>
+                 <string>统计图表</string>
                 </property>
                </widget>
               </item>
@@ -651,7 +640,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
               <item>
                <widget class="QLabel" name="labelSearch">
                 <property name="text">
-                 <string>🔍 高级搜索:</string>
+                 <string>高级搜索:</string>
                 </property>
                </widget>
               </item>
@@ -672,14 +661,14 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
               <item>
                <widget class="QPushButton" name="btnImportCSV">
                 <property name="text">
-                 <string>📄 导入CSV</string>
+                 <string>导入CSV</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="btnImportJSON">
                 <property name="text">
-                 <string>📋 导入JSON</string>
+                 <string>导入JSON</string>
                 </property>
                </widget>
               </item>
@@ -695,7 +684,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
            </property>
            <widget class="QWidget" name="tabData">
             <attribute name="title">
-             <string>📊 数据浏览</string>
+             <string>数据浏览</string>
             </attribute>
             <layout class="QVBoxLayout" name="dataTabLayout">
              <property name="spacing">
@@ -730,7 +719,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
            </widget>
            <widget class="QWidget" name="tabSchema">
             <attribute name="title">
-             <string>📋 表结构</string>
+             <string>表结构</string>
             </attribute>
             <layout class="QVBoxLayout" name="schemaTabLayout">
              <property name="spacing">
@@ -765,7 +754,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
            </widget>
            <widget class="QWidget" name="tabSQL">
             <attribute name="title">
-             <string>💻 SQL执行</string>
+             <string>SQL执行</string>
             </attribute>
             <layout class="QVBoxLayout" name="sqlTabLayout">
              <property name="spacing">
@@ -903,7 +892,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
      <x>0</x>
      <y>0</y>
      <width>1449</width>
-     <height>25</height>
+     <height>32</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

@@ -1,3 +1,4 @@
+//数据迁移工具，CSV/JSON导入导出、数据库备份恢复、表/数据库复制、数据迁移兼容性检查
 #include "datamigrator.h"
 #include <QFile>
 #include <QJsonDocument>

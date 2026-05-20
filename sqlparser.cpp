@@ -1,3 +1,4 @@
+//SQL解析器，DDL解析（CREATE/DROP/ALTER DATABASE/TABLE）、DML解析（SELECT/INSERT/UPDATE/DELETE）、JOIN/UNION/VIEW支持、语义检查
 #include "sqlparser.h"
 #include "storagemanager.h"
 #include "queryengine.h"

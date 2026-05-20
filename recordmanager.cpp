@@ -1,3 +1,4 @@
+//记录CRUD操作，插入/查询/更新/删除记录、记录序列化与反序列化（JSON↔二进制）、数据加密/解密、分页查询
 #include "recordmanager.h"
 #include "storagemanager.h"
 #include "constraintmanager.h"

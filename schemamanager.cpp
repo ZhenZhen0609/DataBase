@@ -1,3 +1,4 @@
+//表结构管理，创建/删除/加载表、字段类型验证、记录完整性验证、默认值填充
 #include "SchemaManager.h"
 #include "storagemanager.h"
 #include <QDebug>

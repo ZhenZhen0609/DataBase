@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
     if (RUN_TESTS_ONLY) {
         QCoreApplication a(argc, argv);
         qRegisterMetaType<TableSchema>();
+        qRegisterMetaType<QJsonArray>();
         // 运行各模块测试
         runAuthTests();
         runSchemaTests();
@@ -58,6 +59,8 @@ int main(int argc, char *argv[])
 
     // 正常启动 GUI 应用程序
     QApplication a(argc, argv);
+    qRegisterMetaType<TableSchema>();
+    qRegisterMetaType<QJsonArray>();
     MainWindow w;
     w.show();
 

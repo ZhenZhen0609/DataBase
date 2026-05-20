@@ -1,3 +1,4 @@
+//用户认证，SHA256密码哈希、登录验证、用户注册、用户文件查找与创建
 #include "AuthManager.h"
 #include <QFile>
 #include <QJsonDocument>

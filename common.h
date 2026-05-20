@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QCoreApplication>
 #include <QDir>
+#include <QJsonArray>
 
 // 定义支持的数据类型
 enum class FieldType {
@@ -77,5 +78,6 @@ const QString USER_FILE = "users.json";
 }
 
 Q_DECLARE_METATYPE(TableSchema)
+Q_DECLARE_METATYPE(QJsonArray)
 
 #endif // COMMON_H

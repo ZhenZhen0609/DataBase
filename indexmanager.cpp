@@ -1,3 +1,4 @@
+//索引管理，创建/删除索引、索引查找、添加/删除索引项、索引文件持久化、索引缓存
 #include "indexmanager.h"
 #include <QDir>
 #include <QFile>

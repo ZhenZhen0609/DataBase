@@ -1,3 +1,4 @@
+//底层存储管理，创建/删除数据库和表、读写表结构(.tdf)和数据文件(.trd)、表头文件(.tb)、缓存机制、事务、备份恢复
 #include "storagemanager.h"
 #include "indexmanager.h"
 #include <QDir>

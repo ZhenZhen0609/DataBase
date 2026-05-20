@@ -4,6 +4,8 @@
 
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QDir>
@@ -36,6 +38,23 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    // 窗口尺寸自适应小屏幕
+    QScreen *screen = QGuiApplication::primaryScreen();
+    QRect screenGeometry = screen->availableGeometry();
+    int screenWidth = screenGeometry.width();
+    int screenHeight = screenGeometry.height();
+
+    // 设置最小窗口尺寸（保证可用性）
+    this->setMinimumSize(1024, 700);
+
+    // 根据屏幕尺寸自适应窗口大小
+    int windowWidth = qMin(1449, screenWidth - 50);
+    int windowHeight = qMin(877, screenHeight - 80);
+    this->resize(windowWidth, windowHeight);
+
+    // 窗口居中显示
+    this->move((screenWidth - windowWidth) / 2, (screenHeight - windowHeight) / 2);
+
     // 认证按钮
     connect(ui->btnLogin,    &QPushButton::clicked, this, &MainWindow::onLogin);
     connect(ui->btnRegister, &QPushButton::clicked, this, &MainWindow::onRegister);
@@ -54,7 +73,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnDropField, &QPushButton::clicked, this, &MainWindow::onDropField);
     connect(ui->btnAlterField, &QPushButton::clicked, this, &MainWindow::onAlterField);
     
-    QPushButton *btnRefreshTree = new QPushButton("🔄 刷新字段", this);
+    QPushButton *btnRefreshTree = new QPushButton("刷新字段", this);
     ui->tableActionsLayout->addWidget(btnRefreshTree, 2, 0, 1, 2);
     connect(btnRefreshTree, &QPushButton::clicked, this, &MainWindow::refreshTree);
 
@@ -70,18 +89,18 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->tableData->horizontalHeader(), &QHeaderView::sectionClicked, this, &MainWindow::onTableHeaderClicked);
 
     // 蓝圈功能: 导出CSV按钮 (动态添加到dataToolbarRow2)
-    QPushButton *btnExportCSV = new QPushButton("📤 导出CSV", this);
+    QPushButton *btnExportCSV = new QPushButton("导出CSV", this);
     btnExportCSV->setObjectName("btnExportCSV");
     ui->dataToolbarRow2->addWidget(btnExportCSV);
     connect(btnExportCSV, &QPushButton::clicked, this, &MainWindow::onExportCSV);
 
     // 蓝圈功能: 备份/恢复数据库按钮 (动态添加到sidebarLayout)
-    QPushButton *btnBackupDb = new QPushButton("💾 备份数据库", this);
+    QPushButton *btnBackupDb = new QPushButton("备份数据库", this);
     btnBackupDb->setObjectName("btnBackupDb");
     ui->sidebarLayout->addWidget(btnBackupDb);
     connect(btnBackupDb, &QPushButton::clicked, this, &MainWindow::onBackupDatabase);
 
-    QPushButton *btnRestoreDb = new QPushButton("📥 恢复数据库", this);
+    QPushButton *btnRestoreDb = new QPushButton("恢复数据库", this);
     btnRestoreDb->setObjectName("btnRestoreDb");
     ui->sidebarLayout->addWidget(btnRestoreDb);
     connect(btnRestoreDb, &QPushButton::clicked, this, &MainWindow::onRestoreDatabase);
@@ -780,13 +799,27 @@ void MainWindow::showDataTable(const QString &username, const QString &dbName, c
 
     Response res = m_record->selectAllRecords(username, dbName, tableName);
     if (res.status != ResponseStatus::OK) {
+        log("[显示数据] 加载失败: " + res.message);
         ui->tableData->setRowCount(0);
         return;
     }
 
-    QJsonArray records = res.data.value<QJsonArray>();
+    QJsonArray records;
+    if (res.data.canConvert<QJsonArray>()) {
+        records = res.data.value<QJsonArray>();
+    } else {
+        log("[显示数据] 数据格式转换失败");
+        ui->tableData->setRowCount(0);
+        return;
+    }
+    
     m_originalData = records;
+    m_totalRows = records.size();
+    updatePaginationLabel();
 
+    // 断开cellChanged信号，防止触发m_isEditing
+    disconnect(ui->tableData, &QTableWidget::cellChanged, this, &MainWindow::onTableCellChanged);
+    
     ui->tableData->setRowCount(records.size());
     for (int i = 0; i < records.size(); ++i) {
         QJsonObject rec = records[i].toObject();
@@ -796,6 +829,12 @@ void MainWindow::showDataTable(const QString &username, const QString &dbName, c
             ui->tableData->setItem(i, j, item);
         }
     }
+    
+    // 重新连接cellChanged信号
+    connect(ui->tableData, &QTableWidget::cellChanged, this, &MainWindow::onTableCellChanged);
+    
+    // 重置编辑状态
+    m_isEditing = false;
 }
 
 void MainWindow::showSchemaTable(const QString &username, const QString &dbName, const QString &tableName)
@@ -1181,6 +1220,9 @@ void MainWindow::onAdvancedSearch()
     QStringList cols;
     for (const Field &f : fields) cols << f.name;
 
+    // 断开cellChanged信号，防止触发m_isEditing
+    disconnect(ui->tableData, &QTableWidget::cellChanged, this, &MainWindow::onTableCellChanged);
+    
     ui->tableData->setColumnCount(cols.size());
     ui->tableData->setHorizontalHeaderLabels(cols);
     ui->tableData->setRowCount(records.size());
@@ -1196,6 +1238,12 @@ void MainWindow::onAdvancedSearch()
             ui->tableData->setItem(row, col, new QTableWidgetItem(text));
         }
     }
+    
+    // 重新连接cellChanged信号
+    connect(ui->tableData, &QTableWidget::cellChanged, this, &MainWindow::onTableCellChanged);
+    
+    // 标记为搜索结果视图，防止误保存
+    m_isEditing = false;
 }
 
 void MainWindow::onTableHeaderClicked(int column)

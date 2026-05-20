@@ -1,3 +1,4 @@
+//约束管理，外键验证、CHECK约束验证、格式验证（email/date/phone）、唯一性验证、级联删除/更新、数据加密/解密（XOR）
 #include "constraintmanager.h"
 #include "storagemanager.h"
 #include "recordmanager.h"

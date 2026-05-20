@@ -1,3 +1,4 @@
+//并发锁管理，表级读写锁的获取与释放、支持多读并发、写独占
 #include "lockmanager.h"
 
 LockManager::LockManager() {}
